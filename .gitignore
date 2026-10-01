@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk.idsig
+app/build/
+
+# Ignore debug APKs but keep release APK
+*.apk
+!GBA_Native_K_Release.apk
