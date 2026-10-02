@@ -21,7 +21,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [2/3] Signing APK...
-call "%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0\apksigner.bat" sign --ks "%USERPROFILE%\.android\debug.keystore" --ks-pass pass:android --key-pass pass:android --out ".\GBA_Native_K_v0.1.apk" "app\build\outputs\apk\release\app-release-aligned.apk"
+call "%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0\apksigner.bat" sign --ks "%USERPROFILE%\.android\debug.keystore" --ks-pass pass:android --key-pass pass:android --out ".\GBA_Native_K_v0.2.apk" "app\build\outputs\apk\release\app-release-aligned.apk"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Signing failed!
     pause
@@ -30,11 +30,11 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [3/3] Verifying APK signature and 16 KB alignment...
-call "%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0\apksigner.bat" verify ".\GBA_Native_K_v0.1.apk"
+call "%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0\apksigner.bat" verify ".\GBA_Native_K_v0.2.apk"
 
 echo.
 echo ====================================================
 echo  BUILD SUCCESSFUL!
-echo  APK: GBA_Native_K_v0.1.apk (16KB Page-Aligned & Ready)
+echo  APK: GBA_Native_K_v0.2.apk (16KB Page-Aligned & Ready)
 echo ====================================================
 pause
