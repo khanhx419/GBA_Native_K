@@ -32,7 +32,7 @@ fun CheatDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Cheat Codes", fontSize = 20.sp) },
+        title = { Text("Mã Gian Lận (Cheats)", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -41,7 +41,7 @@ fun CheatDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Supports GameShark, Action Replay v3, CodeBreaker, and VBA raw cheat formats.",
+                    "Hỗ trợ mã GameShark, Action Replay v3, CodeBreaker và VBA raw.",
                     color = Color.Gray,
                     fontSize = 12.sp
                 )
@@ -56,7 +56,7 @@ fun CheatDialog(
                 OutlinedTextField(
                     value = cheatName,
                     onValueChange = { cheatName = it },
-                    label = { Text("Cheat Description (e.g. Master Ball)") },
+                    label = { Text("Tên mô tả (vd: Master Ball, Kẹo Rare Candy)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -64,7 +64,7 @@ fun CheatDialog(
                 OutlinedTextField(
                     value = cheatCode,
                     onValueChange = { cheatCode = it },
-                    label = { Text("Code (e.g. 82003884 0001)") },
+                    label = { Text("Đoạn mã (vd: 82003884 0001)") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 4
@@ -75,29 +75,29 @@ fun CheatDialog(
                         errorMsg = null
                         successMsg = null
                         if (cheatName.isBlank() || cheatCode.isBlank()) {
-                            errorMsg = "Please enter both description and cheat code."
+                            errorMsg = "Vui lòng nhập đầy đủ tên và đoạn mã cheat."
                             return@Button
                         }
                         val ok = onAddCheat(cheatName.trim(), cheatCode.trim())
                         if (ok) {
-                            successMsg = "Cheat added & activated!"
+                            successMsg = "Đã thêm và kích hoạt mã gian lận!"
                             cheatName = ""
                             cheatCode = ""
                         } else {
-                            errorMsg = "Failed to parse code. Check syntax."
+                            errorMsg = "Cú pháp mã không hợp lệ. Vui lòng kiểm tra lại."
                         }
                     },
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Add Cheat")
+                    Text("Thêm mã gian lận")
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                Text("Active Cheats (${cheats.size})", style = MaterialTheme.typography.titleMedium)
+                Text("Danh sách mã đang kích hoạt (${cheats.size})", style = MaterialTheme.typography.titleMedium)
 
                 if (cheats.isEmpty()) {
-                    Text("No active cheats.", color = Color.Gray, fontSize = 13.sp)
+                    Text("Chưa có mã gian lận nào.", color = Color.Gray, fontSize = 13.sp)
                 } else {
                     cheats.forEach { item ->
                         Card(
@@ -116,14 +116,14 @@ fun CheatDialog(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Clear All Cheats")
+                        Text("Xóa toàn bộ mã gian lận")
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("Đóng")
             }
         }
     )

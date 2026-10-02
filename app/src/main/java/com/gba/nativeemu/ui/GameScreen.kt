@@ -160,41 +160,12 @@ fun GameScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // --- 2. TOP FPS & STATUS OVERLAY ---
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
-                .background(Color(0xCC12121A), RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(if (isFastForward) Color(0xFFFF9100) else Color(0xFF00E676), RoundedCornerShape(4.dp))
-            )
-            Text(
-                fpsText,
-                color = if (isFastForward) Color(0xFFFFB74D) else Color(0xFF00E676),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text("•", color = Color.Gray, fontSize = 11.sp)
-            Text(
-                gameTitle,
-                color = Color.White,
-                fontSize = 11.sp,
-                maxLines = 1,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        // --- 3. VIRTUAL GAMEPAD OVERLAY ---
+        // --- 2. VIRTUAL GAMEPAD OVERLAY ---
         VirtualGamepad(
             modifier = Modifier.fillMaxSize(),
             opacity = settings.gamepadOpacity,
+            fpsText = fpsText,
+            gameTitle = gameTitle,
             isFastForward = isFastForward,
             onFastForwardToggle = {
                 isFastForward = !isFastForward
@@ -205,12 +176,12 @@ fun GameScreen(
             onMenuClick = { showSettingsDialog = true },
             onQuickSave = {
                 val ok = saveRepository.saveState(gameTitle, 1)
-                Toast.makeText(context, if (ok) "💾 Đã Lưu nhanh (Slot 1)" else "❌ Lỗi lưu Slot 1", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, if (ok) "💾 Đã lưu nhanh (Slot 1)" else "❌ Lỗi lưu Slot 1", Toast.LENGTH_SHORT).show()
             },
             onQuickLoad = {
                 if (saveRepository.stateExists(gameTitle, 1)) {
                     val ok = saveRepository.loadState(gameTitle, 1)
-                    Toast.makeText(context, if (ok) "⚡ Đã Tải nhanh (Slot 1)" else "❌ Lỗi tải Slot 1", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, if (ok) "⚡ Đã tải nhanh (Slot 1)" else "❌ Lỗi tải Slot 1", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, "Slot 1 chưa có dữ liệu lưu", Toast.LENGTH_SHORT).show()
                 }
