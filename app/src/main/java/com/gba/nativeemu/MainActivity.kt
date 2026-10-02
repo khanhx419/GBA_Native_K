@@ -5,12 +5,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.View
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,26 +42,27 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep screen on during gameplay
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        try {
+            // Keep screen on during gameplay
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Hide system UI (Fullscreen Immersive)
-        hideSystemUI()
+            romManager = RomManager(this)
+            saveRepository = SaveRepository(this)
 
-        romManager = RomManager(this)
-        saveRepository = SaveRepository(this)
-
-        // Initialize Native Core & Audio safely
-        if (GbaBridge.isLibraryLoaded) {
-            try {
-                GbaBridge.nativeInit(filesDir.absolutePath)
-            } catch (t: Throwable) {
-                android.util.Log.e("MainActivity", "Error in nativeInit", t)
+            // Initialize Native Core & Audio safely
+            if (GbaBridge.isLibraryLoaded) {
+                try {
+                    GbaBridge.nativeInit(filesDir.absolutePath)
+                } catch (t: Throwable) {
+                    android.util.Log.e("MainActivity", "Error in nativeInit", t)
+                }
             }
-        }
 
-        // Check if opened via intent (e.g. user tapped a .gba file in file manager)
-        handleIntent(intent)
+            // Check if opened via intent (e.g. user tapped a .gba file in file manager)
+            handleIntent(intent)
+        } catch (t: Throwable) {
+            android.util.Log.e("MainActivity", "Error during onCreate setup", t)
+        }
 
         setContent {
             GbaNativeTheme {
@@ -214,21 +215,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hideSystemUI() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let { controller ->
-                controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-            )
+        try {
+            val win = this.window ?: return
+            val decorView = win.peekDecorView() ?: win.decorView ?: return
+            WindowCompat.setDecorFitsSystemWindows(win, false)
+            val controller = WindowCompat.getInsetsController(win, decorView)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "Error in hideSystemUI: ${e.message}")
         }
     }
 
