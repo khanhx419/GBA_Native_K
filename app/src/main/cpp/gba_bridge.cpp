@@ -33,6 +33,7 @@ static bool sIsVideoInitialized = false;
 static float sFastForwardRatio = 1.0f;
 
 static void cleanUpCore() {
+    sAudioEngine.stop();
     if (sCore) {
         sCore->unloadROM(sCore);
         sCore->deinit(sCore);
@@ -54,9 +55,6 @@ extern "C" {
 JNIEXPORT jboolean JNICALL
 Java_com_gba_nativeemu_core_GbaBridge_nativeInit(
     JNIEnv* env, jobject /*thiz*/, jstring internalDir) {
-    std::lock_guard<std::mutex> lock(sCoreMutex);
-
-    sAudioEngine.start(44100);
     LOGI("GbaBridge nativeInit completed");
     return JNI_TRUE;
 }
@@ -124,6 +122,7 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeLoadRom(
 
     sCore->reset(sCore);
     sAudioEngine.reset();
+    sAudioEngine.start(44100);
 
     LOGI("GBA ROM loaded successfully (%d bytes)", romSize);
     return JNI_TRUE;
@@ -177,6 +176,7 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeLoadRomFile(
 
     sCore->reset(sCore);
     sAudioEngine.reset();
+    sAudioEngine.start(44100);
 
     LOGI("ROM loaded from file successfully");
     return JNI_TRUE;

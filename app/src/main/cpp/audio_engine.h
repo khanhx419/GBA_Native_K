@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <cstddef>
 #include <atomic>
-#include <oboe/Oboe.h>
+#include <aaudio/AAudio.h>
 
-class AudioEngine : public oboe::AudioStreamDataCallback {
+class AudioEngine {
 public:
     AudioEngine();
     ~AudioEngine();
@@ -22,18 +22,17 @@ public:
     void setVolume(float volume);
     int getSampleRate() const { return mSampleRate; }
 
-    oboe::DataCallbackResult onAudioReady(
-        oboe::AudioStream* oboeStream,
+    aaudio_data_callback_result_t onAudioReady(
         void* audioData,
-        int32_t numFrames) override;
+        int32_t numFrames);
 
 private:
-    static constexpr size_t RING_BUFFER_CAPACITY_FRAMES = 8192; // Stereo frames
-    int16_t mRingBuffer[RING_BUFFER_CAPACITY_FRAMES * 2]; // 2 channels
+    static constexpr size_t RING_BUFFER_CAPACITY_FRAMES = 8192;
+    int16_t mRingBuffer[RING_BUFFER_CAPACITY_FRAMES * 2];
     std::atomic<size_t> mWriteHead{0};
     std::atomic<size_t> mReadHead{0};
 
-    std::shared_ptr<oboe::AudioStream> mStream;
+    AAudioStream* mStream = nullptr;
     int mSampleRate = 44100;
     std::atomic<bool> mMuted{false};
     std::atomic<float> mVolume{1.0f};

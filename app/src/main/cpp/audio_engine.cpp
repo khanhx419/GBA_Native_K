@@ -7,6 +7,15 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+static aaudio_data_callback_result_t aaudioCallback(
+    AAudioStream* /*stream*/,
+    void* userData,
+    void* audioData,
+    int32_t numFrames) {
+    auto* engine = static_cast<AudioEngine*>(userData);
+    return engine ? engine->onAudioReady(audioData, numFrames) : AAUDIO_CALLBACK_RESULT_STOP;
+}
+
 AudioEngine::AudioEngine() {
     std::memset(mRingBuffer, 0, sizeof(mRingBuffer));
 }
@@ -25,52 +34,61 @@ bool AudioEngine::start(int sampleRate) {
     mReadHead.store(0);
     std::memset(mRingBuffer, 0, sizeof(mRingBuffer));
 
-    oboe::AudioStreamBuilder builder;
-    builder.setDirection(oboe::Direction::Output)
-           ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-           ->setSharingMode(oboe::SharingMode::Shared) // Shared has better compatibility across diverse devices
-           ->setFormat(oboe::AudioFormat::I16)
-           ->setChannelCount(oboe::ChannelCount::Stereo)
-           ->setSampleRate(mSampleRate)
-           ->setDataCallback(this);
-
-    oboe::Result result = builder.openStream(mStream);
-    if (result != oboe::Result::OK) {
-        LOGE("Failed to open Oboe audio stream: %s", oboe::convertToText(result));
+    AAudioStreamBuilder* builder = nullptr;
+    aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+    if (result != AAUDIO_OK) {
+        LOGE("Failed to create AAudioStreamBuilder: %s", AAudio_convertResultToText(result));
         return false;
     }
 
-    result = mStream->requestStart();
-    if (result != oboe::Result::OK) {
-        LOGE("Failed to start Oboe audio stream: %s", oboe::convertToText(result));
-        mStream->close();
-        mStream.reset();
+    AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
+    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED);
+    AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_I16);
+    AAudioStreamBuilder_setChannelCount(builder, 2);
+    AAudioStreamBuilder_setSampleRate(builder, mSampleRate);
+    AAudioStreamBuilder_setDataCallback(builder, aaudioCallback, this);
+
+    result = AAudioStreamBuilder_openStream(builder, &mStream);
+    AAudioStreamBuilder_delete(builder);
+
+    if (result != AAUDIO_OK || !mStream) {
+        LOGE("Failed to open AAudioStream: %s", AAudio_convertResultToText(result));
+        mStream = nullptr;
+        return false;
+    }
+
+    result = AAudioStream_requestStart(mStream);
+    if (result != AAUDIO_OK) {
+        LOGE("Failed to start AAudioStream: %s", AAudio_convertResultToText(result));
+        AAudioStream_close(mStream);
+        mStream = nullptr;
         return false;
     }
 
     mIsRunning.store(true);
-    LOGI("Oboe audio stream started successfully (Sample rate: %d)", mSampleRate);
+    LOGI("AAudio stream started successfully (%d Hz stereo)", mSampleRate);
     return true;
 }
 
 void AudioEngine::stop() {
     mIsRunning.store(false);
     if (mStream) {
-        mStream->stop();
-        mStream->close();
-        mStream.reset();
+        AAudioStream_requestStop(mStream);
+        AAudioStream_close(mStream);
+        mStream = nullptr;
     }
 }
 
 void AudioEngine::pause() {
     if (mStream && mIsRunning.load()) {
-        mStream->pause();
+        AAudioStream_requestPause(mStream);
     }
 }
 
 void AudioEngine::resume() {
     if (mStream && mIsRunning.load()) {
-        mStream->requestStart();
+        AAudioStream_requestStart(mStream);
     }
 }
 
@@ -96,7 +114,6 @@ void AudioEngine::writeSamples(const int16_t* samples, size_t numFrames) {
 
     size_t availableSpace = RING_BUFFER_CAPACITY_FRAMES - ((w - r) % RING_BUFFER_CAPACITY_FRAMES) - 1;
     if (availableSpace < numFrames) {
-        // Drop oldest samples to avoid latency build-up
         size_t framesToDrop = numFrames - availableSpace;
         mReadHead.store((r + framesToDrop) % RING_BUFFER_CAPACITY_FRAMES, std::memory_order_release);
     }
@@ -110,8 +127,7 @@ void AudioEngine::writeSamples(const int16_t* samples, size_t numFrames) {
     mWriteHead.store((w + numFrames) % RING_BUFFER_CAPACITY_FRAMES, std::memory_order_release);
 }
 
-oboe::DataCallbackResult AudioEngine::onAudioReady(
-    oboe::AudioStream* /*oboeStream*/,
+aaudio_data_callback_result_t AudioEngine::onAudioReady(
     void* audioData,
     int32_t numFrames) {
 
@@ -119,7 +135,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
 
     if (mMuted.load(std::memory_order_relaxed)) {
         std::memset(out, 0, numFrames * 2 * sizeof(int16_t));
-        return oboe::DataCallbackResult::Continue;
+        return AAUDIO_CALLBACK_RESULT_CONTINUE;
     }
 
     size_t r = mReadHead.load(std::memory_order_relaxed);
@@ -140,11 +156,10 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         }
     }
 
-    // If underrun, fill rest with silence
     if (framesToRead < static_cast<size_t>(numFrames)) {
         std::memset(out + framesToRead * 2, 0, (numFrames - framesToRead) * 2 * sizeof(int16_t));
     }
 
     mReadHead.store((r + framesToRead) % RING_BUFFER_CAPACITY_FRAMES, std::memory_order_release);
-    return oboe::DataCallbackResult::Continue;
+    return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }

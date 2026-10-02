@@ -4,9 +4,6 @@ project("gba_native" C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Google Oboe
-find_package(oboe REQUIRED CONFIG)
-
 # Configure mGBA build flags
 set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(BUILD_STATIC ON CACHE BOOL "" FORCE)
@@ -48,9 +45,12 @@ target_include_directories(gba_native PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/mgba/include
 )
 
+# 16 KB Page size support for Android 15+ kernels
+target_link_options(gba_native PRIVATE "-Wl,-z,max-page-size=16384")
+
 target_link_libraries(gba_native PRIVATE
     mgba
-    oboe::oboe
+    aaudio
     GLESv2
     EGL
     log
