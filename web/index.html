@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBA Native Web Tester - Trình giả lập GBA WebAssembly 60 FPS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.85);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #7c4dff;
+            --primary-gradient: linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%);
+            --secondary: #00e5ff;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(124, 77, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(0, 229, 255, 0.12) 0%, transparent 45%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1040px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-icon {
+            width: 52px;
+            height: 52px;
+            background: var(--primary-gradient);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 4px 20px rgba(124, 77, 255, 0.4);
+        }
+
+        .brand-text h1 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        /* Screen & Player */
+        .player-card {
+            background: #000;
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .player-viewport {
+            width: 100%;
+            height: 520px;
+            background: #05070d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #game-frame {
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+        /* Placeholder / Drop Zone */
+        .dropzone-overlay {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: radial-gradient(circle at center, rgba(124, 77, 255, 0.08) 0%, transparent 70%);
+            border: 2px dashed rgba(124, 77, 255, 0.4);
+            border-radius: 20px;
+        }
+
+        .dropzone-overlay.dragover {
+            background: rgba(124, 77, 255, 0.2);
+            border-color: var(--secondary);
+            transform: scale(0.99);
+        }
+
+        .dropzone-icon {
+            font-size: 56px;
+            margin-bottom: 16px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .dropzone-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .dropzone-subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            max-width: 460px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .btn-choose {
+            background: var(--primary-gradient);
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            padding: 12px 28px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(124, 77, 255, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-choose:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124, 77, 255, 0.6);
+        }
+
+        /* Quick Demos */
+        .quick-demos {
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .demo-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .btn-demo {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-demo:hover {
+            background: rgba(124, 77, 255, 0.25);
+            border-color: var(--primary);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        /* Controls Toolbar */
+        .toolbar {
+            background: rgba(15, 20, 32, 0.95);
+            border-top: 1px solid var(--card-border);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .current-rom-info {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-tool {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            border: 1px solid var(--card-border);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-tool:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        /* Cheatsheet / Info Cards */
+        .grid-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            backdrop-filter: blur(12px);
+        }
+
+        .card h2 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+
+        .key-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .key-table tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .key-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .key-table td {
+            padding: 10px 4px;
+        }
+
+        .key-btn {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 12px;
+            color: #fff;
+            display: inline-block;
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        .feature-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .feature-list li strong {
+            color: var(--text-main);
+        }
+
+        .icon-check {
+            color: var(--accent);
+            font-size: 16px;
+            line-height: 1;
+            margin-top: 2px;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .footer a {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="brand">
+                <div class="brand-icon">🎮</div>
+                <div class="brand-text">
+                    <h1>GBA NATIVE WEB TESTER</h1>
+                    <p>Bộ giả lập Game Boy Advance WebAssembly 60 FPS • Trải nghiệm ngay trên trình duyệt</p>
+                </div>
+            </div>
+            <div class="badge-status">WASM Ready</div>
+        </header>
+
+        <!-- Player Card -->
+        <div class="player-card">
+            <div class="player-viewport" id="viewport">
+                <!-- Dropzone Overlay -->
+                <div class="dropzone-overlay" id="dropzone" onclick="document.getElementById('file-input').click()">
+                    <div class="dropzone-icon">🕹️</div>
+                    <h2 class="dropzone-title">Nạp ROM GBA để bắt đầu chơi</h2>
+                    <p class="dropzone-subtitle">Kéo & thả file ROM (.gba) bất kỳ của bạn vào đây, hoặc click nút bên dưới để chọn file từ máy tính.</p>
+                    <button class="btn-choose" type="button" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
+                        📁 CHỌN FILE ROM (.gba)
+                    </button>
+                    
+                    <div class="quick-demos" onclick="event.stopPropagation()">
+                        <span class="demo-label">Hoặc test nhanh ROM mẫu có sẵn:</span>
+                        <button class="btn-demo" onclick="loadPresetRom('roms/arm.gba', 'GBA ARM Test CPU')">⚡ ARM CPU Test</button>
+                        <button class="btn-demo" onclick="loadPresetRom('roms/thumb.gba', 'GBA Thumb Test')">⚡ Thumb Test</button>
+                    </div>
+                </div>
+
+                <!-- Emulated Game Frame -->
+                <div id="game-frame"></div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="current-rom-info" id="rom-status">
+                    <span>⚡ Trạng thái: Sẵn sàng nạp ROM</span>
+                </div>
+                <div class="toolbar-actions">
+                    <button class="btn-tool" id="btn-fullscreen" onclick="toggleFullscreen()">⛶ Toàn màn hình</button>
+                    <button class="btn-tool" id="btn-reload" onclick="resetPlayer()">🔄 Đổi ROM khác</button>
+                </div>
+            </div>
+        </div>
+
+        <input type="file" id="file-input" accept=".gba,.bin,.zip">
+
+        <!-- Info & Controls Grid -->
+        <div class="grid-info">
+            <!-- Key Mapping -->
+            <div class="card">
+                <h2>🎮 Phím điều khiển trên Bàn phím & Tay cầm</h2>
+                <table class="key-table">
+                    <tr>
+                        <td><strong>Nút GBA</strong></td>
+                        <td><strong>Bàn phím PC</strong></td>
+                        <td><strong>Tay cầm (Gamepad)</strong></td>
+                    </tr>
+                    <tr>
+                        <td>D-Pad (Di chuyển)</td>
+                        <td><span class="key-btn">↑</span> <span class="key-btn">↓</span> <span class="key-btn">←</span> <span class="key-btn">→</span> hoặc <span class="key-btn">W</span><span class="key-btn">A</span><span class="key-btn">S</span><span class="key-btn">D</span></td>
+                        <td>D-Pad / Cần Analog Trái</td>
+                    </tr>
+                    <tr>
+                        <td>Nút A</td>
+                        <td><span class="key-btn">X</span></td>
+                        <td>Nút A (Xbox) / ✕ (PS)</td>
+                    </tr>
+                    <tr>
+                        <td>Nút B</td>
+                        <td><span class="key-btn">Z</span></td>
+                        <td>Nút B (Xbox) / ○ (PS)</td>
+                    </tr>
+                    <tr>
+                        <td>Nút L (Vai Trái)</td>
+                        <td><span class="key-btn">A</span> hoặc <span class="key-btn">Q</span></td>
+                        <td>Cò L1 / LB</td>
+                    </tr>
+                    <tr>
+                        <td>Nút R (Vai Phải)</td>
+                        <td><span class="key-btn">S</span> hoặc <span class="key-btn">E</span></td>
+                        <td>Cò R1 / RB</td>
+                    </tr>
+                    <tr>
+                        <td>Nút START</td>
+                        <td><span class="key-btn">Enter</span></td>
+                        <td>Nút Start / Menu</td>
+                    </tr>
+                    <tr>
+                        <td>Nút SELECT</td>
+                        <td><span class="key-btn">Shift</span> hoặc <span class="key-btn">Space</span></td>
+                        <td>Nút Select / Back / Share</td>
+                    </tr>
+                    <tr>
+                        <td>Tua nhanh (Fast Forward)</td>
+                        <td><span class="key-btn">Tab</span></td>
+                        <td>R2 / RT</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Features -->
+            <div class="card">
+                <h2>⚡ Công nghệ & Tính năng</h2>
+                <ul class="feature-list">
+                    <li>
+                        <span class="icon-check">✔</span>
+                        <div><strong>WebAssembly mGBA Core:</strong> Chạy nhân giả lập mGBA biên dịch sang WASM chuẩn 60 FPS mượt mà.</div>
+                    </li>
+                    <li>
+                        <span class="icon-check">✔</span>
+                        <div><strong>Low Latency WebAudio:</strong> Hệ thống âm thanh stereo trực tiếp qua AudioContext trình duyệt.</div>
+                    </li>
+                    <li>
+                        <span class="icon-check">✔</span>
+                        <div><strong>Plug & Play Gamepad:</strong> Tự động nhận diện tay cầm Xbox, DualShock/DualSense PS4/PS5, hoặc tay cầm USB Bluetooth.</div>
+                    </li>
+                    <li>
+                        <span class="icon-check">✔</span>
+                        <div><strong>Save / Load State:</strong> Lưu trạng thái game (Save State) tức thì và tải lại bất cứ lúc nào.</div>
+                    </li>
+                    <li>
+                        <span class="icon-check">✔</span>
+                        <div><strong>Bảo mật 100%:</strong> File ROM chạy hoàn toàn offline trong RAM trình duyệt, không tải lên bất kỳ máy chủ nào.</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>Dự án GBA Native K • Đồng bộ mã nguồn Native Android NDK & Web Tester • <a href="https://github.com/khanhx419/GBA_Native_K" target="_blank">GitHub Repository</a></p>
+        </footer>
+    </div>
+
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const gameFrame = document.getElementById('game-frame');
+        const romStatus = document.getElementById('rom-status');
+
+        // Drag & Drop Handlers
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropzone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+            });
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                handleRomFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleRomFile(e.target.files[0]);
+            }
+        });
+
+        function handleRomFile(file) {
+            if (!file.name.match(/\.(gba|bin|zip)$/i)) {
+                alert('Vui lòng chọn file định dạng .gba hoặc .zip!');
+                return;
+            }
+            const blobUrl = URL.createObjectURL(file);
+            startEmulator(blobUrl, file.name);
+        }
+
+        function loadPresetRom(relativePath, name) {
+            startEmulator(relativePath, name);
+        }
+
+        function startEmulator(romUrl, gameName) {
+            dropzone.style.display = 'none';
+            gameFrame.style.display = 'block';
+            gameFrame.innerHTML = '<div id="game" style="width:100%;height:100%;"></div>';
+            romStatus.innerHTML = `<span>🎮 Đang chạy: <strong>${escapeHtml(gameName)}</strong></span>`;
+
+            // Configure EmulatorJS
+            window.EJS_player = '#game';
+            window.EJS_core = 'gba';
+            window.EJS_gameName = gameName;
+            window.EJS_gameUrl = romUrl;
+            window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+            window.EJS_startOnLoaded = true;
+            window.EJS_color = '#7c4dff';
+            window.EJS_fullscreenOnLoaded = false;
+            window.EJS_defaultControls = {
+                0: {
+                    'UP': 'ArrowUp',
+                    'DOWN': 'ArrowDown',
+                    'LEFT': 'ArrowLeft',
+                    'RIGHT': 'ArrowRight',
+                    'A': 'KeyX',
+                    'B': 'KeyZ',
+                    'L': 'KeyA',
+                    'R': 'KeyS',
+                    'START': 'Enter',
+                    'SELECT': 'ShiftLeft'
+                }
+            };
+
+            // Remove existing script if any
+            const existingScript = document.getElementById('ejs-loader');
+            if (existingScript) existingScript.remove();
+
+            const script = document.createElement('script');
+            script.id = 'ejs-loader';
+            script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+            document.body.appendChild(script);
+        }
+
+        function resetPlayer() {
+            if (confirm('Bạn có muốn dừng game hiện tại và chọn ROM khác?')) {
+                window.location.reload();
+            }
+        }
+
+        function toggleFullscreen() {
+            const viewport = document.getElementById('viewport');
+            if (!document.fullscreenElement) {
+                if (viewport.requestFullscreen) {
+                    viewport.requestFullscreen();
+                } else if (viewport.webkitRequestFullscreen) {
+                    viewport.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
