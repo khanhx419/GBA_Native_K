@@ -330,13 +330,46 @@ fun ActionButtonsCluster(
     onMaskChanged: (Int) -> Unit
 ) {
     var pressedMask by remember { mutableStateOf(0) }
+    var isTurboAPressed by remember { mutableStateOf(false) }
+    var isTurboBPressed by remember { mutableStateOf(false) }
+    var turboMask by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isTurboAPressed) {
+        if (isTurboAPressed) {
+            while (isTurboAPressed) {
+                turboMask = turboMask or GbaBridge.KEY_A
+                kotlinx.coroutines.delay(40)
+                turboMask = turboMask and GbaBridge.KEY_A.inv()
+                kotlinx.coroutines.delay(40)
+            }
+        } else {
+            turboMask = turboMask and GbaBridge.KEY_A.inv()
+        }
+    }
+
+    LaunchedEffect(isTurboBPressed) {
+        if (isTurboBPressed) {
+            while (isTurboBPressed) {
+                turboMask = turboMask or GbaBridge.KEY_B
+                kotlinx.coroutines.delay(40)
+                turboMask = turboMask and GbaBridge.KEY_B.inv()
+                kotlinx.coroutines.delay(40)
+            }
+        } else {
+            turboMask = turboMask and GbaBridge.KEY_B.inv()
+        }
+    }
+
+    LaunchedEffect(pressedMask, turboMask) {
+        onMaskChanged(pressedMask or turboMask)
+    }
 
     Box(modifier = modifier) {
         // Combo A+B Button (Top Center of Action Cluster)
         GamepadButton(
             text = "A+B",
             modifier = Modifier
-                .size(46.dp)
+                .size(44.dp)
                 .align(Alignment.TopCenter),
             shape = CircleShape,
             color = Color(0xFF4A148C),
@@ -344,7 +377,38 @@ fun ActionButtonsCluster(
             onPressState = { pressed ->
                 if (pressed) onHaptic()
                 pressedMask = if (pressed) pressedMask or (GbaBridge.KEY_A or GbaBridge.KEY_B) else pressedMask and (GbaBridge.KEY_A or GbaBridge.KEY_B).inv()
-                onMaskChanged(pressedMask)
+            }
+        )
+
+        // Turbo B Button
+        GamepadButton(
+            text = "TB",
+            modifier = Modifier
+                .size(44.dp)
+                .align(Alignment.CenterStart)
+                .padding(bottom = 24.dp),
+            shape = CircleShape,
+            color = Color(0xFFE65100),
+            fontSize = 13.sp,
+            onPressState = { pressed ->
+                if (pressed) onHaptic()
+                isTurboBPressed = pressed
+            }
+        )
+
+        // Turbo A Button
+        GamepadButton(
+            text = "TA",
+            modifier = Modifier
+                .size(44.dp)
+                .align(Alignment.CenterEnd)
+                .padding(bottom = 24.dp),
+            shape = CircleShape,
+            color = Color(0xFF00838F),
+            fontSize = 13.sp,
+            onPressState = { pressed ->
+                if (pressed) onHaptic()
+                isTurboAPressed = pressed
             }
         )
 
@@ -354,14 +418,13 @@ fun ActionButtonsCluster(
             modifier = Modifier
                 .size(62.dp)
                 .align(Alignment.BottomStart)
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             shape = CircleShape,
             color = Color(0xFFB71C1C),
             fontSize = 22.sp,
             onPressState = { pressed ->
                 if (pressed) onHaptic()
                 pressedMask = if (pressed) pressedMask or GbaBridge.KEY_B else pressedMask and GbaBridge.KEY_B.inv()
-                onMaskChanged(pressedMask)
             }
         )
 
@@ -370,15 +433,14 @@ fun ActionButtonsCluster(
             text = "A",
             modifier = Modifier
                 .size(62.dp)
-                .align(Alignment.TopEnd)
-                .padding(top = 18.dp),
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 20.dp),
             shape = CircleShape,
             color = Color(0xFF1B5E20),
             fontSize = 22.sp,
             onPressState = { pressed ->
                 if (pressed) onHaptic()
                 pressedMask = if (pressed) pressedMask or GbaBridge.KEY_A else pressedMask and GbaBridge.KEY_A.inv()
-                onMaskChanged(pressedMask)
             }
         )
     }

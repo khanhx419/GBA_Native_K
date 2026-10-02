@@ -1,13 +1,20 @@
 package com.gba.nativeemu.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
@@ -26,6 +33,8 @@ data class EmulatorSettings(
 fun SettingsDialog(
     settings: EmulatorSettings,
     onSettingsChanged: (EmulatorSettings) -> Unit,
+    onOpenSaveStates: () -> Unit,
+    onOpenCheats: () -> Unit,
     onResetGame: () -> Unit,
     onCloseRom: () -> Unit,
     onDismiss: () -> Unit
@@ -40,7 +49,13 @@ fun SettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Settings & Emulation", fontSize = 20.sp) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Settings, contentDescription = null, tint = Color(0xFF7C4DFF))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cài đặt & Tùy chọn", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -48,158 +63,190 @@ fun SettingsDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // --- VIDEO SHADER ---
-                Text("Display Shader / Filter", style = MaterialTheme.typography.titleSmall)
+                // --- PHÍM TẮT NHANH TÍNH NĂNG ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onOpenSaveStates,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C3E)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save States", fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = onOpenCheats,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C3E)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Cheats", fontSize = 12.sp)
+                    }
+                }
+
+                Divider(color = Color(0x33FFFFFF))
+
+                // --- BỘ LỌC HÌNH ẢNH (SHADERS) ---
+                Text("Bộ lọc hiển thị (Shaders)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val filters = listOf(
                         "Pixel" to GbaBridge.FILTER_NEAREST,
-                        "Smooth" to GbaBridge.FILTER_BILINEAR,
+                        "Mịn" to GbaBridge.FILTER_BILINEAR,
                         "LCD" to GbaBridge.FILTER_LCD,
                         "CRT" to GbaBridge.FILTER_CRT
                     )
-                    filters.forEach { (label, value) ->
+                    filters.forEach { (name, value) ->
                         FilterChip(
                             selected = filter == value,
                             onClick = {
                                 filter = value
-                                GbaBridge.nativeSetFilter(value)
+                                onSettingsChanged(settings.copy(filterType = value))
                             },
-                            label = { Text(label, fontSize = 11.sp) }
+                            label = { Text(name, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
 
-                // --- ASPECT RATIO ---
-                Text("Aspect Ratio", style = MaterialTheme.typography.titleSmall)
+                // --- TỈ LỆ KHUNG HÌNH (ASPECT RATIO) ---
+                Text("Tỉ lệ màn hình", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val aspects = listOf(
-                        "3:2 Fit" to GbaBridge.ASPECT_FIT,
-                        "Stretch" to GbaBridge.ASPECT_STRETCH,
+                        "Gốc 3:2" to GbaBridge.ASPECT_FIT,
+                        "Kéo dãn" to GbaBridge.ASPECT_STRETCH,
                         "1x" to GbaBridge.ASPECT_1X,
                         "2x" to GbaBridge.ASPECT_2X
                     )
-                    aspects.forEach { (label, value) ->
+                    aspects.forEach { (name, value) ->
                         FilterChip(
                             selected = aspect == value,
                             onClick = {
                                 aspect = value
-                                GbaBridge.nativeSetAspectRatio(value)
+                                onSettingsChanged(settings.copy(aspectMode = value))
                             },
-                            label = { Text(label, fontSize = 11.sp) }
+                            label = { Text(name, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
 
-                // --- FAST FORWARD SPEED ---
-                Text("Fast Forward Speed: ${speed}x", style = MaterialTheme.typography.titleSmall)
-                Slider(
-                    value = speed,
-                    onValueChange = { speed = it },
-                    valueRange = 1.5f..8.0f,
-                    steps = 12
-                )
+                // --- TỐC ĐỘ TUA NHANH ---
+                Text("Tốc độ tua nhanh: ${speed.toInt()}x", style = MaterialTheme.typography.titleSmall, color = Color(0xFFFF9100))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(1.5f, 2.0f, 3.0f, 4.0f, 8.0f).forEach { s ->
+                        FilterChip(
+                            selected = speed == s,
+                            onClick = {
+                                speed = s
+                                onSettingsChanged(settings.copy(fastForwardSpeed = s))
+                            },
+                            label = { Text("${s}x", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
 
-                // --- AUDIO VOLUME ---
+                // --- ÂM LƯỢNG & TẮT TIẾNG ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Mute Sound", style = MaterialTheme.typography.titleSmall)
+                    Text("Âm lượng: ${(vol * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
                     Switch(
-                        checked = muted,
+                        checked = !muted,
+                        onCheckedChange = { checked ->
+                            muted = !checked
+                            onSettingsChanged(settings.copy(isMuted = !checked))
+                        }
+                    )
+                }
+                Slider(
+                    value = vol,
+                    onValueChange = {
+                        vol = it
+                        onSettingsChanged(settings.copy(volume = it))
+                    },
+                    valueRange = 0f..1f
+                )
+
+                // --- ĐỘ MỜ PHÍM ẢO ---
+                Text("Độ mờ phím ảo: ${(opacity * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                Slider(
+                    value = opacity,
+                    onValueChange = {
+                        opacity = it
+                        onSettingsChanged(settings.copy(gamepadOpacity = it))
+                    },
+                    valueRange = 0.2f..1.0f
+                )
+
+                // --- RUNG XÚC GIÁC ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Rung phản hồi (Haptics)", style = MaterialTheme.typography.titleSmall)
+                    Switch(
+                        checked = haptic,
                         onCheckedChange = {
-                            muted = it
-                            GbaBridge.nativeSetAudioMute(it)
+                            haptic = it
+                            onSettingsChanged(settings.copy(hapticFeedback = it))
                         }
                     )
                 }
 
-                if (!muted) {
-                    Text("Volume: ${(vol * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
-                    Slider(
-                        value = vol,
-                        onValueChange = {
-                            vol = it
-                            GbaBridge.nativeSetAudioVolume(it)
-                        },
-                        valueRange = 0.0f..1.0f
-                    )
-                }
+                Divider(color = Color(0x33FFFFFF))
 
-                // --- CONTROLLER OPACITY & HAPTIC ---
-                Text("Gamepad Opacity: ${(opacity * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
-                Slider(
-                    value = opacity,
-                    onValueChange = { opacity = it },
-                    valueRange = 0.2f..1.0f
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Vibration / Haptic", style = MaterialTheme.typography.titleSmall)
-                    Switch(checked = haptic, onCheckedChange = { haptic = it })
-                }
-
-                HorizontalDivider()
-
-                // --- GAME ACTIONS ---
+                // --- NÚT HỆ THỐNG (RESET & THOÁT) ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = {
-                            onResetGame()
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f)
+                        onClick = onResetGame,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFB74D)),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Reset Game", color = Color(0xFFFF9100), fontSize = 12.sp)
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Reset Game", fontSize = 12.sp)
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            onCloseRom()
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f)
+                    Button(
+                        onClick = onCloseRom,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Exit Game", color = Color(0xFFFF5252), fontSize = 12.sp)
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Đóng ROM", fontSize = 12.sp)
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                onSettingsChanged(
-                    settings.copy(
-                        filterType = filter,
-                        aspectMode = aspect,
-                        fastForwardSpeed = speed,
-                        volume = vol,
-                        isMuted = muted,
-                        gamepadOpacity = opacity,
-                        hapticFeedback = haptic
-                    )
-                )
-                onDismiss()
-            }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Xong", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
             }
         }
     )

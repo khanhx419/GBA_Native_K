@@ -30,16 +30,16 @@ fun RomPickerScreen(
     onOpenRomPicker: () -> Unit,
     onSelectRecentRom: (RomInfo) -> Unit
 ) {
-    val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F14))
-            .padding(24.dp),
+            .background(Color(0xFF0D0D14))
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // App Header Banner
         Box(
@@ -48,17 +48,17 @@ fun RomPickerScreen(
                 .clip(RoundedCornerShape(20.dp))
                 .background(
                     Brush.horizontalGradient(
-                        listOf(Color(0xFF4A148C), Color(0xFF7C4DFF), Color(0xFF00E5FF))
+                        listOf(Color(0xFF4A148C), Color(0xFF6A1B9A), Color(0xFF00B0FF))
                     )
                 )
-                .padding(24.dp)
+                .padding(20.dp)
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.VideogameAsset,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = Color(0xFF00E5FF),
                         modifier = Modifier.size(36.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -70,16 +70,16 @@ fun RomPickerScreen(
                         letterSpacing = 2.sp
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "60 FPS Native C++ mGBA Core • Low Latency Audio • SIMD NEON",
-                    color = Color(0xCCFFFFFF),
-                    fontSize = 12.sp
+                    "Core mGBA Native C++ • 60 FPS Pacer (Mát máy) • AAudio Low Latency",
+                    color = Color(0xDDFFFFFF),
+                    fontSize = 11.5.sp
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Open ROM Button
         Button(
@@ -90,12 +90,12 @@ fun RomPickerScreen(
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF))
         ) {
-            Icon(Icons.Default.FolderOpen, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("OPEN GBA ROM (.gba)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text("MỞ ROM GBA (.gba)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Recents Section
         Row(
@@ -104,20 +104,20 @@ fun RomPickerScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "RECENT GAMES",
-                color = Color.Gray,
+                "TRÒ CHƠI GẦN ĐÂY",
+                color = Color(0xFFB0B0C0),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
             Text(
-                "${recentRoms.size} games",
+                "${recentRoms.size} game",
                 color = Color.Gray,
                 fontSize = 12.sp
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         if (recentRoms.isEmpty()) {
             Box(
@@ -128,66 +128,82 @@ fun RomPickerScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        Icons.Default.VideogameAsset,
+                        Icons.Default.FolderOpen,
                         contentDescription = null,
-                        tint = Color(0xFF333348),
+                        tint = Color(0xFF3A3A4E),
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("No recent games played.", color = Color.Gray, fontSize = 14.sp)
-                    Text("Select 'OPEN GBA ROM' to start playing!", color = Color.DarkGray, fontSize = 12.sp)
+                    Text(
+                        "Chưa có trò chơi nào",
+                        color = Color.Gray,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Nhấn nút bên trên để chọn file .gba và bắt đầu chơi",
+                        color = Color(0xFF555566),
+                        fontSize = 12.sp
+                    )
                 }
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(recentRoms) { item ->
+                items(recentRoms) { rom ->
+                    val sizeMb = String.format(Locale.US, "%.1f MB", rom.fileSize / (1024.0 * 1024.0))
+                    val dateStr = dateFormat.format(Date(rom.lastPlayed))
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSelectRecentRom(item) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A24))
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onSelectRecentRom(rom) },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF181824)),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                                .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    item.title,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF2C2C3E)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00E5FF),
+                                    modifier = Modifier.size(28.dp)
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(
-                                        "${item.fileSize / (1024 * 1024)} MB",
-                                        color = Color(0xFF00E5FF),
-                                        fontSize = 11.sp
-                                    )
-                                    Text("•", color = Color.Gray, fontSize = 11.sp)
-                                    Text(
-                                        dateFormat.format(Date(item.lastPlayed)),
-                                        color = Color.Gray,
-                                        fontSize = 11.sp
-                                    )
-                                }
                             }
 
-                            IconButton(
-                                onClick = { onSelectRecentRom(item) },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(Color(0xFF7C4DFF), RoundedCornerShape(10.dp))
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White)
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    rom.title,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    "$sizeMb • $dateStr",
+                                    color = Color(0xFF888899),
+                                    fontSize = 11.5.sp
+                                )
                             }
                         }
                     }

@@ -436,6 +436,15 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeRenderFrame(
 }
 
 JNIEXPORT void JNICALL
+Java_com_gba_nativeemu_core_GbaBridge_nativeRedrawFrame(
+    JNIEnv* /*env*/, jobject /*thiz*/) {
+    std::lock_guard<std::mutex> lock(sCoreMutex);
+    if (sIsVideoInitialized) {
+        sVideoRenderer.render();
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_gba_nativeemu_core_GbaBridge_nativeSetFilter(
     JNIEnv* /*env*/, jobject /*thiz*/, jint filterType) {
     sVideoRenderer.setFilter(static_cast<VideoFilter>(filterType));

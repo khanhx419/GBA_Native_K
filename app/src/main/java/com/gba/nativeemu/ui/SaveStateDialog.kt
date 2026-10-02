@@ -2,15 +2,22 @@ package com.gba.nativeemu.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.storage.SaveRepository
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun SaveStateDialog(
@@ -23,10 +30,13 @@ fun SaveStateDialog(
     onDismiss: () -> Unit
 ) {
     var message by remember { mutableStateOf<String?>(null) }
+    val dateFormat = remember { SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Save States & Data", fontSize = 20.sp) },
+        title = {
+            Text("Quản lý Lưu / Tải Game", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -35,64 +45,81 @@ fun SaveStateDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (message != null) {
-                    Text(message!!, color = Color(0xFF00E676), fontSize = 13.sp)
+                    Text(message!!, color = Color(0xFF00E676), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
 
-                Text("Save State Slots", style = MaterialTheme.typography.titleMedium)
+                Text("Các vị trí lưu nhanh (Save Slots)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
 
                 (1..5).forEach { slot ->
-                    val exists = saveRepository.stateExists(gameName, slot)
+                    val file = saveRepository.getStateFile(gameName, slot)
+                    val exists = file.exists()
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E28))
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E28)),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text("Slot $slot", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                                Text(
-                                    if (exists) "Saved" else "Empty",
-                                    color = if (exists) Color(0xFF81C784) else Color.Gray,
-                                    fontSize = 11.sp
-                                )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Vị trí $slot", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                if (exists) {
+                                    val dateStr = dateFormat.format(Date(file.lastModified()))
+                                    val sizeKb = file.length() / 1024
+                                    Text(
+                                        "$dateStr (${sizeKb} KB)",
+                                        color = Color(0xFF81C784),
+                                        fontSize = 11.sp
+                                    )
+                                } else {
+                                    Text(
+                                        "Trống",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Button(
                                     onClick = {
                                         onSaveState(slot)
-                                        message = "Saved to Slot $slot"
+                                        message = "💾 Đã lưu vào Vị trí $slot"
                                     },
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("SAVE", fontSize = 11.sp)
+                                    Text("LƯU", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
 
                                 OutlinedButton(
                                     onClick = {
                                         onLoadState(slot)
-                                        message = "Loaded Slot $slot"
+                                        message = "⚡ Đã tải Vị trí $slot"
                                     },
                                     enabled = exists,
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("LOAD", fontSize = 11.sp)
+                                    Text("TẢI", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Color(0x33FFFFFF), modifier = Modifier.padding(vertical = 4.dp))
 
-                Text("Battery Save (.sav)", style = MaterialTheme.typography.titleMedium)
+                Text("Bộ nhớ Pin (.sav)", style = MaterialTheme.typography.titleSmall, color = Color(0xFFFF9100))
                 Text(
-                    "Export .sav file to backup to your PC / other emulators, or import an existing save.",
+                    "Xuất file .sav để sao lưu sang PC hoặc giả lập khác, hoặc nhập file .sav có sẵn.",
                     color = Color.Gray,
                     fontSize = 12.sp
                 )
@@ -103,23 +130,29 @@ fun SaveStateDialog(
                 ) {
                     OutlinedButton(
                         onClick = onExportBattery,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Export .sav", fontSize = 12.sp)
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Xuất .sav", fontSize = 12.sp)
                     }
 
                     OutlinedButton(
                         onClick = onImportBattery,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Import .sav", fontSize = 12.sp)
+                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Nhập .sav", fontSize = 12.sp)
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("Đóng", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
             }
         }
     )

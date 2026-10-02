@@ -74,6 +74,7 @@ object GbaBridge {
     external fun nativeSurfaceCreated()
     external fun nativeSurfaceChanged(width: Int, height: Int)
     external fun nativeRenderFrame(keyMask: Int)
+    external fun nativeRedrawFrame()
     external fun nativeSetFilter(filterType: Int)
     external fun nativeSetAspectRatio(mode: Int)
 }
