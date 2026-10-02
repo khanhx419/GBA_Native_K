@@ -1,7 +1,5 @@
 package com.gba.nativeemu.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -20,13 +17,11 @@ import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
 
 data class EmulatorSettings(
-    val filterType: Int = GbaBridge.FILTER_NEAREST,
     val aspectMode: Int = GbaBridge.ASPECT_FIT,
     val fastForwardSpeed: Float = 2.0f,
     val volume: Float = 1.0f,
     val isMuted: Boolean = false,
-    val gamepadOpacity: Float = 0.85f,
-    val hapticFeedback: Boolean = true
+    val gamepadOpacity: Float = 0.85f
 )
 
 @Composable
@@ -39,13 +34,11 @@ fun SettingsDialog(
     onCloseRom: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var filter by remember { mutableStateOf(settings.filterType) }
     var aspect by remember { mutableStateOf(settings.aspectMode) }
     var speed by remember { mutableStateOf(settings.fastForwardSpeed) }
     var vol by remember { mutableStateOf(settings.volume) }
     var muted by remember { mutableStateOf(settings.isMuted) }
     var opacity by remember { mutableStateOf(settings.gamepadOpacity) }
-    var haptic by remember { mutableStateOf(settings.hapticFeedback) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -91,32 +84,7 @@ fun SettingsDialog(
                     }
                 }
 
-                Divider(color = Color(0x33FFFFFF))
-
-                // --- BỘ LỌC HÌNH ẢNH (SHADERS) ---
-                Text("Bộ lọc hiển thị (Shaders)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    val filters = listOf(
-                        "Pixel" to GbaBridge.FILTER_NEAREST,
-                        "Mịn" to GbaBridge.FILTER_BILINEAR,
-                        "LCD" to GbaBridge.FILTER_LCD,
-                        "CRT" to GbaBridge.FILTER_CRT
-                    )
-                    filters.forEach { (name, value) ->
-                        FilterChip(
-                            selected = filter == value,
-                            onClick = {
-                                filter = value
-                                onSettingsChanged(settings.copy(filterType = value))
-                            },
-                            label = { Text(name, fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+                HorizontalDivider(color = Color(0x33FFFFFF))
 
                 // --- TỈ LỆ KHUNG HÌNH (ASPECT RATIO) ---
                 Text("Tỉ lệ màn hình", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
@@ -197,23 +165,7 @@ fun SettingsDialog(
                     valueRange = 0.2f..1.0f
                 )
 
-                // --- RUNG XÚC GIÁC ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Rung phản hồi (Haptics)", style = MaterialTheme.typography.titleSmall)
-                    Switch(
-                        checked = haptic,
-                        onCheckedChange = {
-                            haptic = it
-                            onSettingsChanged(settings.copy(hapticFeedback = it))
-                        }
-                    )
-                }
-
-                Divider(color = Color(0x33FFFFFF))
+                HorizontalDivider(color = Color(0x33FFFFFF))
 
                 // --- NÚT HỆ THỐNG (RESET & THOÁT) ---
                 Row(

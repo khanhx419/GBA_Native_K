@@ -2,7 +2,6 @@ package com.gba.nativeemu.ui
 
 import android.content.Context
 import android.opengl.GLSurfaceView
-import android.os.Vibrator
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -39,16 +38,6 @@ fun GameScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val vibrator = remember {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
-            vm?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
-    }
-
     var currentKeyMask by remember { mutableStateOf(0) }
     var isFastForward by remember { mutableStateOf(false) }
     var fpsText by remember { mutableStateOf("60 FPS • Mát máy") }
@@ -67,7 +56,7 @@ fun GameScreen(
             setRenderer(object : GLSurfaceView.Renderer {
                 override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                     GbaBridge.nativeSurfaceCreated()
-                    GbaBridge.nativeSetFilter(settings.filterType)
+                    GbaBridge.nativeSetFilter(GbaBridge.FILTER_NEAREST)
                     GbaBridge.nativeSetAspectRatio(settings.aspectMode)
                 }
 
@@ -206,8 +195,6 @@ fun GameScreen(
         VirtualGamepad(
             modifier = Modifier.fillMaxSize(),
             opacity = settings.gamepadOpacity,
-            hapticEnabled = settings.hapticFeedback,
-            vibrator = vibrator,
             isFastForward = isFastForward,
             onFastForwardToggle = {
                 isFastForward = !isFastForward
@@ -239,7 +226,6 @@ fun GameScreen(
                 settings = settings,
                 onSettingsChanged = { newSettings ->
                     onSettingsChanged(newSettings)
-                    GbaBridge.nativeSetFilter(newSettings.filterType)
                     GbaBridge.nativeSetAspectRatio(newSettings.aspectMode)
                     GbaBridge.nativeSetAudioVolume(newSettings.volume)
                     GbaBridge.nativeSetAudioMute(newSettings.isMuted)

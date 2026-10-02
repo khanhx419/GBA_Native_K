@@ -1,8 +1,5 @@
 package com.gba.nativeemu.ui
 
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -13,8 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -40,8 +37,6 @@ import kotlin.math.sqrt
 fun VirtualGamepad(
     modifier: Modifier = Modifier,
     opacity: Float = 0.85f,
-    hapticEnabled: Boolean = true,
-    vibrator: Vibrator?,
     isFastForward: Boolean,
     onFastForwardToggle: () -> Unit,
     onMenuClick: () -> Unit,
@@ -49,20 +44,8 @@ fun VirtualGamepad(
     onQuickLoad: () -> Unit,
     onKeyMaskChanged: (Int) -> Unit
 ) {
-    // Current active keys bitmask
     var dpadMask by remember { mutableStateOf(0) }
     var actionMask by remember { mutableStateOf(0) }
-
-    fun triggerHaptic() {
-        if (hapticEnabled && vibrator != null && vibrator.hasVibrator()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(15)
-            }
-        }
-    }
 
     LaunchedEffect(dpadMask, actionMask) {
         onKeyMaskChanged(dpadMask or actionMask)
@@ -91,7 +74,6 @@ fun VirtualGamepad(
                 shape = RoundedCornerShape(topStart = 16.dp, bottomEnd = 16.dp),
                 color = Color(0xFF2C2C3E),
                 onPressState = { pressed ->
-                    if (pressed) triggerHaptic()
                     actionMask = if (pressed) actionMask or GbaBridge.KEY_L else actionMask and GbaBridge.KEY_L.inv()
                 }
             )
@@ -102,10 +84,7 @@ fun VirtualGamepad(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = {
-                        triggerHaptic()
-                        onFastForwardToggle()
-                    },
+                    onClick = onFastForwardToggle,
                     modifier = Modifier
                         .size(36.dp)
                         .background(if (isFastForward) Color(0xFFFF9100) else Color(0x66000000), CircleShape)
@@ -119,10 +98,7 @@ fun VirtualGamepad(
                 }
 
                 IconButton(
-                    onClick = {
-                        triggerHaptic()
-                        onQuickSave()
-                    },
+                    onClick = onQuickSave,
                     modifier = Modifier
                         .size(36.dp)
                         .background(Color(0x66000000), CircleShape)
@@ -131,10 +107,7 @@ fun VirtualGamepad(
                 }
 
                 IconButton(
-                    onClick = {
-                        triggerHaptic()
-                        onQuickLoad()
-                    },
+                    onClick = onQuickLoad,
                     modifier = Modifier
                         .size(36.dp)
                         .background(Color(0x66000000), CircleShape)
@@ -143,10 +116,7 @@ fun VirtualGamepad(
                 }
 
                 IconButton(
-                    onClick = {
-                        triggerHaptic()
-                        onMenuClick()
-                    },
+                    onClick = onMenuClick,
                     modifier = Modifier
                         .size(36.dp)
                         .background(Color(0x66000000), CircleShape)
@@ -164,7 +134,6 @@ fun VirtualGamepad(
                 shape = RoundedCornerShape(topEnd = 16.dp, bottomStart = 16.dp),
                 color = Color(0xFF2C2C3E),
                 onPressState = { pressed ->
-                    if (pressed) triggerHaptic()
                     actionMask = if (pressed) actionMask or GbaBridge.KEY_R else actionMask and GbaBridge.KEY_R.inv()
                 }
             )
@@ -183,7 +152,6 @@ fun VirtualGamepad(
             CircularDPad(
                 modifier = Modifier.size(170.dp),
                 onDirectionChanged = { mask ->
-                    if (mask != dpadMask && mask != 0) triggerHaptic()
                     dpadMask = mask
                 }
             )
@@ -194,20 +162,16 @@ fun VirtualGamepad(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Select
                 PillButton(
                     text = "SELECT",
                     onPressState = { pressed ->
-                        if (pressed) triggerHaptic()
                         actionMask = if (pressed) actionMask or GbaBridge.KEY_SELECT else actionMask and GbaBridge.KEY_SELECT.inv()
                     }
                 )
 
-                // Start
                 PillButton(
                     text = "START",
                     onPressState = { pressed ->
-                        if (pressed) triggerHaptic()
                         actionMask = if (pressed) actionMask or GbaBridge.KEY_START else actionMask and GbaBridge.KEY_START.inv()
                     }
                 )
@@ -216,7 +180,6 @@ fun VirtualGamepad(
             // Right: Action Buttons Cluster (B, A, Turbo B, Turbo A, Combo A+B)
             ActionButtonsCluster(
                 modifier = Modifier.size(180.dp),
-                onHaptic = { triggerHaptic() },
                 onMaskChanged = { mask ->
                     actionMask = (actionMask and (GbaBridge.KEY_L or GbaBridge.KEY_R or GbaBridge.KEY_START or GbaBridge.KEY_SELECT)) or mask
                 }
@@ -251,26 +214,48 @@ fun CircularDPad(
                         break
                     }
                 } while (event.changes.any { it.pressed })
-
-                touchPos = null
-                onDirectionChanged(0)
             }
         }
     ) {
         val center = Offset(size.width / 2f, size.height / 2f)
         val radius = size.width / 2f
 
-        // Outer Glow/Base Disc
-        drawCircle(color = Color(0x33000000), radius = radius, center = center)
-        drawCircle(color = Color(0xFF1E1E28), radius = radius - 8f, center = center)
-        drawCircle(color = Color(0x44FFFFFF), radius = radius - 8f, center = center, style = Stroke(width = 2.5f))
+        // Outer rim
+        drawCircle(
+            color = Color(0xFF1E1E28),
+            radius = radius,
+            center = center
+        )
+        drawCircle(
+            color = Color(0xFF3A3A4E),
+            radius = radius,
+            center = center,
+            style = Stroke(width = 3.dp.toPx())
+        )
 
-        // Center Nub / Thumb Position
-        val nubPos = touchPos?.let { pos ->
+        // Cross D-Pad Shape
+        val crossWidth = radius * 0.7f
+        val crossThickness = radius * 0.44f
+
+        drawRoundRect(
+            color = Color(0xFF2C2C3E),
+            topLeft = Offset(center.x - crossThickness / 2, center.y - crossWidth),
+            size = androidx.compose.ui.geometry.Size(crossThickness, crossWidth * 2),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+        )
+        drawRoundRect(
+            color = Color(0xFF2C2C3E),
+            topLeft = Offset(center.x - crossWidth, center.y - crossThickness / 2),
+            size = androidx.compose.ui.geometry.Size(crossWidth * 2, crossThickness),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+        )
+
+        // Center Thumb Dimple / Indicator
+        val activeCenter = touchPos?.let { pos ->
             val dx = pos.x - center.x
             val dy = pos.y - center.y
             val dist = sqrt(dx * dx + dy * dy)
-            val maxDist = radius * 0.45f
+            val maxDist = radius * 0.5f
             if (dist > maxDist) {
                 Offset(center.x + (dx / dist) * maxDist, center.y + (dy / dist) * maxDist)
             } else {
@@ -278,40 +263,33 @@ fun CircularDPad(
             }
         } ?: center
 
-        // Directional Cross Markings
-        val crossColor = Color(0x88FFFFFF)
-        val crossThickness = 12f
-        // Horizontal bar
-        drawLine(crossColor, Offset(center.x - radius * 0.7f, center.y), Offset(center.x + radius * 0.7f, center.y), strokeWidth = crossThickness)
-        // Vertical bar
-        drawLine(crossColor, Offset(center.x, center.y - radius * 0.7f), Offset(center.x, center.y + radius * 0.7f), strokeWidth = crossThickness)
-
-        // Center Stick Nub
-        drawCircle(color = Color(0xFF333348), radius = 26f, center = nubPos)
-        drawCircle(color = Color(0xFF7C4DFF), radius = 26f, center = nubPos, style = Stroke(width = 3f))
+        drawCircle(
+            color = if (touchPos != null) Color(0xFF00E5FF) else Color(0xFF16161E),
+            radius = radius * 0.22f,
+            center = activeCenter
+        )
     }
 }
 
-private fun updateDirection(pos: Offset, size: Float, onDirectionChanged: (Int) -> Unit) {
-    val center = Offset(size / 2f, size / 2f)
-    val dx = pos.x - center.x
-    val dy = pos.y - center.y
+private fun updateDirection(pos: Offset, viewSize: Float, onDirectionChanged: (Int) -> Unit) {
+    val cx = viewSize / 2f
+    val cy = viewSize / 2f
+    val dx = pos.x - cx
+    val dy = pos.y - cy
     val dist = sqrt(dx * dx + dy * dy)
-    val deadzone = size * 0.12f
 
-    if (dist < deadzone) {
+    val deadZone = viewSize * 0.08f
+    if (dist < deadZone) {
         onDirectionChanged(0)
         return
     }
 
-    // Angle in degrees (-180 to 180)
     var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
     if (angle < 0) angle += 360f
 
     var mask = 0
-    // 8-Way Direction slices (each 45 degrees, centered around 0, 45, 90, 135, 180, 225, 270, 315)
     when {
-        angle >= 337.5f || angle < 22.5f -> mask = GbaBridge.KEY_RIGHT
+        angle in 337.5f..360f || angle in 0.0f..22.5f -> mask = GbaBridge.KEY_RIGHT
         angle in 22.5f..67.5f -> mask = GbaBridge.KEY_RIGHT or GbaBridge.KEY_DOWN
         angle in 67.5f..112.5f -> mask = GbaBridge.KEY_DOWN
         angle in 112.5f..157.5f -> mask = GbaBridge.KEY_LEFT or GbaBridge.KEY_DOWN
@@ -326,7 +304,6 @@ private fun updateDirection(pos: Offset, size: Float, onDirectionChanged: (Int) 
 @Composable
 fun ActionButtonsCluster(
     modifier: Modifier = Modifier,
-    onHaptic: () -> Unit,
     onMaskChanged: (Int) -> Unit
 ) {
     var pressedMask by remember { mutableStateOf(0) }
@@ -375,7 +352,6 @@ fun ActionButtonsCluster(
             color = Color(0xFF4A148C),
             fontSize = 12.sp,
             onPressState = { pressed ->
-                if (pressed) onHaptic()
                 pressedMask = if (pressed) pressedMask or (GbaBridge.KEY_A or GbaBridge.KEY_B) else pressedMask and (GbaBridge.KEY_A or GbaBridge.KEY_B).inv()
             }
         )
@@ -391,7 +367,6 @@ fun ActionButtonsCluster(
             color = Color(0xFFE65100),
             fontSize = 13.sp,
             onPressState = { pressed ->
-                if (pressed) onHaptic()
                 isTurboBPressed = pressed
             }
         )
@@ -407,7 +382,6 @@ fun ActionButtonsCluster(
             color = Color(0xFF00838F),
             fontSize = 13.sp,
             onPressState = { pressed ->
-                if (pressed) onHaptic()
                 isTurboAPressed = pressed
             }
         )
@@ -423,7 +397,6 @@ fun ActionButtonsCluster(
             color = Color(0xFFB71C1C),
             fontSize = 22.sp,
             onPressState = { pressed ->
-                if (pressed) onHaptic()
                 pressedMask = if (pressed) pressedMask or GbaBridge.KEY_B else pressedMask and GbaBridge.KEY_B.inv()
             }
         )
@@ -439,7 +412,6 @@ fun ActionButtonsCluster(
             color = Color(0xFF1B5E20),
             fontSize = 22.sp,
             onPressState = { pressed ->
-                if (pressed) onHaptic()
                 pressedMask = if (pressed) pressedMask or GbaBridge.KEY_A else pressedMask and GbaBridge.KEY_A.inv()
             }
         )
@@ -467,7 +439,7 @@ fun GamepadButton(
                     isPressed = true
                     onPressState(true)
 
-                    val up = eventStreamHasUpOrCancel(down.id)
+                    eventStreamHasUpOrCancel(down.id)
                     isPressed = false
                     onPressState(false)
                 }
@@ -513,15 +485,21 @@ fun PillButton(
                     }
                 }
         )
-        Text(text = text, color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = text,
+            color = Color.Gray,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
     }
 }
 
 private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.eventStreamHasUpOrCancel(pointerId: androidx.compose.ui.input.pointer.PointerId): Boolean {
     while (true) {
         val event = awaitPointerEvent()
-        val pointer = event.changes.find { it.id == pointerId }
-        if (pointer == null || !pointer.pressed) {
+        val change = event.changes.find { it.id == pointerId } ?: return false
+        if (!change.pressed) {
             return true
         }
     }
