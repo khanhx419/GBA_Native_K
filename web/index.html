@@ -3,14 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GBA Native Web Tester - Trình giả lập GBA WebAssembly 60 FPS</title>
+    <title>GBA Native Web Tester - 100% Offline 60 FPS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Standalone Offline GBA Engine (by Jeffrey Pfau / mGBA Creator) -->
+    <script src="gbajs/js/util.js"></script>
+    <script src="gbajs/js/core.js"></script>
+    <script src="gbajs/js/arm.js"></script>
+    <script src="gbajs/js/thumb.js"></script>
+    <script src="gbajs/js/mmu.js"></script>
+    <script src="gbajs/js/io.js"></script>
+    <script src="gbajs/js/audio.js"></script>
+    <script src="gbajs/js/video.js"></script>
+    <script src="gbajs/js/video/proxy.js"></script>
+    <script src="gbajs/js/video/software.js"></script>
+    <script src="gbajs/js/irq.js"></script>
+    <script src="gbajs/js/keypad.js"></script>
+    <script src="gbajs/js/sio.js"></script>
+    <script src="gbajs/js/savedata.js"></script>
+    <script src="gbajs/js/gpio.js"></script>
+    <script src="gbajs/js/gba.js"></script>
+    <script src="gbajs/resources/xhr.js"></script>
+
     <style>
         :root {
             --bg-color: #0b0f19;
-            --card-bg: rgba(22, 28, 45, 0.85);
+            --card-bg: rgba(22, 28, 45, 0.9);
             --card-border: rgba(255, 255, 255, 0.08);
             --primary: #7c4dff;
             --primary-gradient: linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%);
@@ -30,8 +50,8 @@
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--bg-color);
             background-image: 
-                radial-gradient(circle at 15% 15%, rgba(124, 77, 255, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 85% 85%, rgba(0, 229, 255, 0.12) 0%, transparent 45%);
+                radial-gradient(circle at 15% 15%, rgba(124, 77, 255, 0.18) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(0, 229, 255, 0.15) 0%, transparent 45%);
             background-attachment: fixed;
             color: var(--text-main);
             min-height: 100vh;
@@ -43,7 +63,7 @@
 
         .container {
             width: 100%;
-            max-width: 1040px;
+            max-width: 980px;
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -54,12 +74,12 @@
             background: var(--card-bg);
             border: 1px solid var(--card-border);
             border-radius: 20px;
-            padding: 24px 32px;
+            padding: 20px 28px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             backdrop-filter: blur(12px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         }
 
         .brand {
@@ -69,19 +89,19 @@
         }
 
         .brand-icon {
-            width: 52px;
-            height: 52px;
+            width: 48px;
+            height: 48px;
             background: var(--primary-gradient);
             border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
+            font-size: 26px;
             box-shadow: 0 4px 20px rgba(124, 77, 255, 0.4);
         }
 
         .brand-text h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 800;
             letter-spacing: -0.5px;
             background: var(--primary-gradient);
@@ -92,7 +112,7 @@
         .brand-text p {
             color: var(--text-muted);
             font-size: 13px;
-            margin-top: 4px;
+            margin-top: 3px;
         }
 
         .badge-status {
@@ -123,13 +143,13 @@
             50% { opacity: 0.5; transform: scale(0.85); }
         }
 
-        /* Screen & Player */
+        /* Player Card */
         .player-card {
             background: #000;
             border: 1px solid var(--card-border);
             border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
             display: flex;
             flex-direction: column;
             position: relative;
@@ -137,52 +157,55 @@
 
         .player-viewport {
             width: 100%;
-            height: 520px;
+            min-height: 480px;
             background: #05070d;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-
-        #game-frame {
-            width: 100%;
-            height: 100%;
-            display: none;
-        }
-
-        /* Placeholder / Drop Zone */
-        .dropzone-overlay {
-            width: 100%;
-            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 30px;
+            position: relative;
+            padding: 16px;
+        }
+
+        canvas#screen {
+            width: 100%;
+            max-width: 720px;
+            aspect-ratio: 3 / 2;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: pixelated;
+            background: #000;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+
+        /* Drop Zone */
+        .dropzone-overlay {
+            width: 100%;
+            max-width: 680px;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
             text-align: center;
             cursor: pointer;
             transition: all 0.25s ease;
-            background: radial-gradient(circle at center, rgba(124, 77, 255, 0.08) 0%, transparent 70%);
-            border: 2px dashed rgba(124, 77, 255, 0.4);
-            border-radius: 20px;
+            background: radial-gradient(circle at center, rgba(124, 77, 255, 0.1) 0%, transparent 70%);
+            border: 2px dashed rgba(124, 77, 255, 0.5);
+            border-radius: 16px;
         }
 
-        .dropzone-overlay.dragover {
+        .dropzone-overlay:hover, .dropzone-overlay.dragover {
             background: rgba(124, 77, 255, 0.2);
             border-color: var(--secondary);
             transform: scale(0.99);
         }
 
         .dropzone-icon {
-            font-size: 56px;
+            font-size: 52px;
             margin-bottom: 16px;
-            animation: float 3s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
         }
 
         .dropzone-title {
@@ -195,9 +218,9 @@
         .dropzone-subtitle {
             color: var(--text-muted);
             font-size: 14px;
-            max-width: 460px;
+            max-width: 440px;
             line-height: 1.5;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .btn-choose {
@@ -223,7 +246,7 @@
             margin-top: 24px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -231,6 +254,8 @@
         .demo-label {
             font-size: 13px;
             color: var(--text-muted);
+            width: 100%;
+            margin-bottom: 4px;
         }
 
         .btn-demo {
@@ -246,17 +271,17 @@
         }
 
         .btn-demo:hover {
-            background: rgba(124, 77, 255, 0.25);
+            background: rgba(124, 77, 255, 0.3);
             border-color: var(--primary);
             color: #fff;
             transform: translateY(-1px);
         }
 
-        /* Controls Toolbar */
+        /* Toolbar */
         .toolbar {
             background: rgba(15, 20, 32, 0.95);
             border-top: 1px solid var(--card-border);
-            padding: 14px 24px;
+            padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -275,11 +300,12 @@
 
         .toolbar-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            align-items: center;
         }
 
         .btn-tool {
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.08);
             color: var(--text-main);
             border: 1px solid var(--card-border);
             padding: 8px 14px;
@@ -294,11 +320,75 @@
         }
 
         .btn-tool:hover {
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.16);
             color: #fff;
         }
 
-        /* Cheatsheet / Info Cards */
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-right: 8px;
+        }
+
+        .volume-control input[type="range"] {
+            width: 80px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        /* Virtual Gamepad for On-Screen / Touch */
+        .virtual-controls {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            justify-content: space-between;
+            padding: 16px 20px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .dpad-cluster, .action-cluster {
+            display: grid;
+            gap: 6px;
+        }
+
+        .dpad-cluster {
+            grid-template-columns: repeat(3, 46px);
+            grid-template-rows: repeat(3, 46px);
+        }
+
+        .action-cluster {
+            grid-template-columns: repeat(2, 54px);
+            grid-template-rows: repeat(2, 54px);
+            align-items: center;
+        }
+
+        .touch-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #fff;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .touch-btn:active {
+            background: var(--primary);
+            transform: scale(0.95);
+        }
+
+        .touch-btn.round {
+            border-radius: 50%;
+        }
+
+        /* Info Grid */
         .grid-info {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -380,7 +470,6 @@
             margin-top: 2px;
         }
 
-        /* Footer */
         .footer {
             margin-top: 10px;
             text-align: center;
@@ -406,10 +495,10 @@
                 <div class="brand-icon">🎮</div>
                 <div class="brand-text">
                     <h1>GBA NATIVE WEB TESTER</h1>
-                    <p>Bộ giả lập Game Boy Advance WebAssembly 60 FPS • Trải nghiệm ngay trên trình duyệt</p>
+                    <p>Giả lập GBA 60 FPS Chạy 100% Offline Trên Trình Duyệt</p>
                 </div>
             </div>
-            <div class="badge-status">WASM Ready</div>
+            <div class="badge-status">Core Sẵn Sàng</div>
         </header>
 
         <!-- Player Card -->
@@ -419,20 +508,41 @@
                 <div class="dropzone-overlay" id="dropzone" onclick="document.getElementById('file-input').click()">
                     <div class="dropzone-icon">🕹️</div>
                     <h2 class="dropzone-title">Nạp ROM GBA để bắt đầu chơi</h2>
-                    <p class="dropzone-subtitle">Kéo & thả file ROM (.gba) bất kỳ của bạn vào đây, hoặc click nút bên dưới để chọn file từ máy tính.</p>
+                    <p class="dropzone-subtitle">Kéo & thả file ROM (.gba) của bạn vào đây, hoặc click nút bên dưới để chọn file từ máy tính.</p>
                     <button class="btn-choose" type="button" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
                         📁 CHỌN FILE ROM (.gba)
                     </button>
                     
                     <div class="quick-demos" onclick="event.stopPropagation()">
-                        <span class="demo-label">Hoặc test nhanh ROM mẫu có sẵn:</span>
-                        <button class="btn-demo" onclick="loadPresetRom('roms/arm.gba', 'GBA ARM Test CPU')">⚡ ARM CPU Test</button>
-                        <button class="btn-demo" onclick="loadPresetRom('roms/thumb.gba', 'GBA Thumb Test')">⚡ Thumb Test</button>
+                        <span class="demo-label">Hoặc test nhanh ROM mẫu có sẵn ngay lập tức:</span>
+                        <button class="btn-demo" onclick="loadPreset('roms/arm.gba', 'GBA ARM Test CPU')">⚡ Chạy ROM Test ARM CPU</button>
+                        <button class="btn-demo" onclick="loadPreset('roms/thumb.gba', 'GBA Thumb Test')">⚡ Chạy ROM Test Thumb</button>
                     </div>
                 </div>
 
-                <!-- Emulated Game Frame -->
-                <div id="game-frame"></div>
+                <!-- Emulated Game Screen Canvas -->
+                <canvas id="screen" width="480" height="320"></canvas>
+
+                <!-- On-Screen Controls for Touch / Testing -->
+                <div class="virtual-controls" id="touch-controls">
+                    <div class="dpad-cluster">
+                        <div></div>
+                        <button class="touch-btn" data-key="UP">▲</button>
+                        <div></div>
+                        <button class="touch-btn" data-key="LEFT">◀</button>
+                        <div></div>
+                        <button class="touch-btn" data-key="RIGHT">▶</button>
+                        <div></div>
+                        <button class="touch-btn" data-key="DOWN">▼</button>
+                        <div></div>
+                    </div>
+                    <div class="action-cluster">
+                        <button class="touch-btn round" data-key="B">B</button>
+                        <button class="touch-btn round" data-key="A">A</button>
+                        <button class="touch-btn" data-key="SELECT" style="font-size:11px">SEL</button>
+                        <button class="touch-btn" data-key="START" style="font-size:11px">START</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Toolbar -->
@@ -441,17 +551,22 @@
                     <span>⚡ Trạng thái: Sẵn sàng nạp ROM</span>
                 </div>
                 <div class="toolbar-actions">
+                    <div class="volume-control">
+                        <span>🔊</span>
+                        <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="1">
+                    </div>
+                    <button class="btn-tool" id="btn-pause" onclick="togglePause()">⏸ Tạm dừng</button>
+                    <button class="btn-tool" id="btn-reset" onclick="resetGame()">🔄 Reset</button>
                     <button class="btn-tool" id="btn-fullscreen" onclick="toggleFullscreen()">⛶ Toàn màn hình</button>
-                    <button class="btn-tool" id="btn-reload" onclick="resetPlayer()">🔄 Đổi ROM khác</button>
+                    <button class="btn-tool" onclick="document.getElementById('file-input').click()">📁 Đổi ROM</button>
                 </div>
             </div>
         </div>
 
-        <input type="file" id="file-input" accept=".gba,.bin,.zip">
+        <input type="file" id="file-input" accept=".gba,.bin">
 
-        <!-- Info & Controls Grid -->
+        <!-- Controls Guide -->
         <div class="grid-info">
-            <!-- Key Mapping -->
             <div class="card">
                 <h2>🎮 Phím điều khiển trên Bàn phím & Tay cầm</h2>
                 <table class="key-table">
@@ -462,27 +577,27 @@
                     </tr>
                     <tr>
                         <td>D-Pad (Di chuyển)</td>
-                        <td><span class="key-btn">↑</span> <span class="key-btn">↓</span> <span class="key-btn">←</span> <span class="key-btn">→</span> hoặc <span class="key-btn">W</span><span class="key-btn">A</span><span class="key-btn">S</span><span class="key-btn">D</span></td>
+                        <td><span class="key-btn">↑</span> <span class="key-btn">↓</span> <span class="key-btn">←</span> <span class="key-btn">→</span></td>
                         <td>D-Pad / Cần Analog Trái</td>
                     </tr>
                     <tr>
                         <td>Nút A</td>
-                        <td><span class="key-btn">X</span></td>
+                        <td><span class="key-btn">Z</span></td>
                         <td>Nút A (Xbox) / ✕ (PS)</td>
                     </tr>
                     <tr>
                         <td>Nút B</td>
-                        <td><span class="key-btn">Z</span></td>
+                        <td><span class="key-btn">X</span></td>
                         <td>Nút B (Xbox) / ○ (PS)</td>
                     </tr>
                     <tr>
                         <td>Nút L (Vai Trái)</td>
-                        <td><span class="key-btn">A</span> hoặc <span class="key-btn">Q</span></td>
+                        <td><span class="key-btn">A</span></td>
                         <td>Cò L1 / LB</td>
                     </tr>
                     <tr>
                         <td>Nút R (Vai Phải)</td>
-                        <td><span class="key-btn">S</span> hoặc <span class="key-btn">E</span></td>
+                        <td><span class="key-btn">S</span></td>
                         <td>Cò R1 / RB</td>
                     </tr>
                     <tr>
@@ -492,156 +607,299 @@
                     </tr>
                     <tr>
                         <td>Nút SELECT</td>
-                        <td><span class="key-btn">Shift</span> hoặc <span class="key-btn">Space</span></td>
-                        <td>Nút Select / Back / Share</td>
-                    </tr>
-                    <tr>
-                        <td>Tua nhanh (Fast Forward)</td>
-                        <td><span class="key-btn">Tab</span></td>
-                        <td>R2 / RT</td>
+                        <td><span class="key-btn">\</span> hoặc <span class="key-btn">Space</span></td>
+                        <td>Nút Back / Select</td>
                     </tr>
                 </table>
             </div>
 
-            <!-- Features -->
             <div class="card">
-                <h2>⚡ Công nghệ & Tính năng</h2>
+                <h2>⚡ Ưu điểm của Web Engine</h2>
                 <ul class="feature-list">
                     <li>
                         <span class="icon-check">✔</span>
-                        <div><strong>WebAssembly mGBA Core:</strong> Chạy nhân giả lập mGBA biên dịch sang WASM chuẩn 60 FPS mượt mà.</div>
+                        <div><strong>100% Chạy Cục Bộ (Zero CDN):</strong> Toàn bộ mã nguồn giả lập nằm trực tiếp trên máy tính của bạn, không phụ thuộc vào internet hay dịch vụ ngoài.</div>
                     </li>
                     <li>
                         <span class="icon-check">✔</span>
-                        <div><strong>Low Latency WebAudio:</strong> Hệ thống âm thanh stereo trực tiếp qua AudioContext trình duyệt.</div>
+                        <div><strong>Tốc độ 60 FPS:</strong> Vẽ trực tiếp lên HTML5 Canvas với thuật toán pixelated sắc nét nguyên bản GBA (240x160).</div>
                     </li>
                     <li>
                         <span class="icon-check">✔</span>
-                        <div><strong>Plug & Play Gamepad:</strong> Tự động nhận diện tay cầm Xbox, DualShock/DualSense PS4/PS5, hoặc tay cầm USB Bluetooth.</div>
+                        <div><strong>Âm thanh WebAudio:</strong> Phát âm thanh nổi Stereo qua AudioContext tích hợp sẵn của trình duyệt.</div>
                     </li>
                     <li>
                         <span class="icon-check">✔</span>
-                        <div><strong>Save / Load State:</strong> Lưu trạng thái game (Save State) tức thì và tải lại bất cứ lúc nào.</div>
-                    </li>
-                    <li>
-                        <span class="icon-check">✔</span>
-                        <div><strong>Bảo mật 100%:</strong> File ROM chạy hoàn toàn offline trong RAM trình duyệt, không tải lên bất kỳ máy chủ nào.</div>
+                        <div><strong>Hỗ trợ Tay cầm USB/Bluetooth:</strong> Cắm tay cầm PS4, PS5, Xbox vào máy là điều khiển được ngay.</div>
                     </li>
                 </ul>
             </div>
         </div>
 
         <footer class="footer">
-            <p>Dự án GBA Native K • Đồng bộ mã nguồn Native Android NDK & Web Tester • <a href="https://github.com/khanhx419/GBA_Native_K" target="_blank">GitHub Repository</a></p>
+            <p>Dự án GBA Native K • <a href="https://github.com/khanhx419/GBA_Native_K" target="_blank">GitHub Repository</a></p>
         </footer>
     </div>
 
     <script>
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('file-input');
-        const gameFrame = document.getElementById('game-frame');
-        const romStatus = document.getElementById('rom-status');
+        var gba = null;
+        var canvas = document.getElementById('screen');
+        var dropzone = document.getElementById('dropzone');
+        var fileInput = document.getElementById('file-input');
+        var romStatus = document.getElementById('rom-status');
+        var btnPause = document.getElementById('btn-pause');
+        var volSlider = document.getElementById('vol-slider');
+        var touchControls = document.getElementById('touch-controls');
 
-        // Drag & Drop Handlers
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropzone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropzone.classList.add('dragover');
-            });
-        });
+        // Initialize GBA Core
+        function initGbaCore() {
+            try {
+                gba = new GameBoyAdvance();
+                gba.keypad.eatInput = false;
+                gba.setCanvas(canvas);
+                gba.logLevel = gba.LOG_ERROR;
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropzone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropzone.classList.remove('dragover');
-            });
-        });
+                // Load local bios
+                loadRom('gbajs/resources/bios.bin', function(bios) {
+                    if (bios) {
+                        gba.setBios(bios);
+                        console.log("BIOS loaded successfully");
+                    }
+                });
 
-        dropzone.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files && files.length > 0) {
-                handleRomFile(files[0]);
+                console.log("GBA Core initialized");
+            } catch (e) {
+                console.error("GBA Core Init Failed:", e);
+                romStatus.innerHTML = `<span style="color:#ef4444">❌ Lỗi khởi tạo Core: ${e.message}</span>`;
             }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initGbaCore();
+            setupDragAndDrop();
+            setupVirtualControls();
+            setupGamepadPolling();
         });
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                handleRomFile(e.target.files[0]);
-            }
-        });
+        // Drag & Drop
+        function setupDragAndDrop() {
+            ['dragenter', 'dragover'].forEach(name => {
+                dropzone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('dragover');
+                });
+            });
 
-        function handleRomFile(file) {
-            if (!file.name.match(/\.(gba|bin|zip)$/i)) {
-                alert('Vui lòng chọn file định dạng .gba hoặc .zip!');
+            ['dragleave', 'drop'].forEach(name => {
+                dropzone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('dragover');
+                });
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    loadUserFile(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    loadUserFile(e.target.files[0]);
+                }
+            });
+        }
+
+        function loadUserFile(file) {
+            if (!file.name.match(/\.(gba|bin)$/i)) {
+                alert('Vui lòng chọn file ROM định dạng .gba!');
                 return;
             }
-            const blobUrl = URL.createObjectURL(file);
-            startEmulator(blobUrl, file.name);
-        }
 
-        function loadPresetRom(relativePath, name) {
-            startEmulator(relativePath, name);
-        }
-
-        function startEmulator(romUrl, gameName) {
-            dropzone.style.display = 'none';
-            gameFrame.style.display = 'block';
-            gameFrame.innerHTML = '<div id="game" style="width:100%;height:100%;"></div>';
-            romStatus.innerHTML = `<span>🎮 Đang chạy: <strong>${escapeHtml(gameName)}</strong></span>`;
-
-            // Configure EmulatorJS
-            window.EJS_player = '#game';
-            window.EJS_core = 'gba';
-            window.EJS_gameName = gameName;
-            window.EJS_gameUrl = romUrl;
-            window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
-            window.EJS_startOnLoaded = true;
-            window.EJS_color = '#7c4dff';
-            window.EJS_fullscreenOnLoaded = false;
-            window.EJS_defaultControls = {
-                0: {
-                    'UP': 'ArrowUp',
-                    'DOWN': 'ArrowDown',
-                    'LEFT': 'ArrowLeft',
-                    'RIGHT': 'ArrowRight',
-                    'A': 'KeyX',
-                    'B': 'KeyZ',
-                    'L': 'KeyA',
-                    'R': 'KeyS',
-                    'START': 'Enter',
-                    'SELECT': 'ShiftLeft'
+            prepareScreen(file.name);
+            gba.loadRomFromFile(file, function(success) {
+                if (success) {
+                    gba.runStable();
+                    romStatus.innerHTML = `<span>🎮 Đang chạy: <strong>${escapeHtml(file.name)}</strong> (60 FPS)</span>`;
+                } else {
+                    alert('Không thể nạp file ROM này!');
+                    resetGame();
                 }
-            };
-
-            // Remove existing script if any
-            const existingScript = document.getElementById('ejs-loader');
-            if (existingScript) existingScript.remove();
-
-            const script = document.createElement('script');
-            script.id = 'ejs-loader';
-            script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
-            document.body.appendChild(script);
+            });
         }
 
-        function resetPlayer() {
-            if (confirm('Bạn có muốn dừng game hiện tại và chọn ROM khác?')) {
-                window.location.reload();
+        function loadPreset(path, name) {
+            prepareScreen(name);
+            loadRom(path, function(data) {
+                if (data) {
+                    gba.setRom(data);
+                    gba.runStable();
+                    romStatus.innerHTML = `<span>🎮 Đang chạy: <strong>${escapeHtml(name)}</strong> (60 FPS)</span>`;
+                } else {
+                    alert('Lỗi tải ROM mẫu: ' + path);
+                    resetGame();
+                }
+            });
+        }
+
+        function prepareScreen(name) {
+            dropzone.style.display = 'none';
+            canvas.style.display = 'block';
+            touchControls.style.display = 'flex';
+            romStatus.innerHTML = `<span>⏳ Đang nạp ROM: <strong>${escapeHtml(name)}</strong>...</span>`;
+
+            // Reset pause state
+            btnPause.textContent = "⏸ Tạm dừng";
+        }
+
+        function togglePause() {
+            if (!gba) return;
+            if (gba.paused) {
+                gba.runStable();
+                btnPause.textContent = "⏸ Tạm dừng";
+            } else {
+                gba.pause();
+                btnPause.textContent = "▶ Tiếp tục";
             }
+        }
+
+        function resetGame() {
+            if (!gba) return;
+            gba.pause();
+            gba.reset();
+            canvas.style.display = 'none';
+            touchControls.style.display = 'none';
+            dropzone.style.display = 'flex';
+            romStatus.innerHTML = `<span>⚡ Trạng thái: Sẵn sàng nạp ROM</span>`;
+            fileInput.value = '';
         }
 
         function toggleFullscreen() {
-            const viewport = document.getElementById('viewport');
+            var viewport = document.getElementById('viewport');
             if (!document.fullscreenElement) {
-                if (viewport.requestFullscreen) {
-                    viewport.requestFullscreen();
-                } else if (viewport.webkitRequestFullscreen) {
-                    viewport.webkitRequestFullscreen();
-                }
+                viewport.requestFullscreen().catch(err => alert(err.message));
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
+                document.exitFullscreen();
             }
+        }
+
+        // Volume control
+        volSlider.addEventListener('input', (e) => {
+            if (gba && gba.audio) {
+                var val = parseFloat(e.target.value);
+                gba.audio.masterVolume = Math.pow(2, val) - 1;
+            }
+        });
+
+        // Touch button mapping
+        function setupVirtualControls() {
+            const keyMap = {
+                'UP': gba?.keypad?.UP,
+                'DOWN': gba?.keypad?.DOWN,
+                'LEFT': gba?.keypad?.LEFT,
+                'RIGHT': gba?.keypad?.RIGHT,
+                'A': gba?.keypad?.A,
+                'B': gba?.keypad?.B,
+                'START': gba?.keypad?.START,
+                'SELECT': gba?.keypad?.SELECT
+            };
+
+            document.querySelectorAll('.touch-btn').forEach(btn => {
+                const kName = btn.dataset.key;
+                
+                const press = (e) => {
+                    e.preventDefault();
+                    if (gba && gba.keypad) {
+                        gba.keypad.keyboardHandler({
+                            type: 'keydown',
+                            keyCode: getKeyCodeFor(kName),
+                            preventDefault: () => {}
+                        });
+                    }
+                };
+
+                const release = (e) => {
+                    e.preventDefault();
+                    if (gba && gba.keypad) {
+                        gba.keypad.keyboardHandler({
+                            type: 'keyup',
+                            keyCode: getKeyCodeFor(kName),
+                            preventDefault: () => {}
+                        });
+                    }
+                };
+
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('touchstart', press, { passive: false });
+                btn.addEventListener('touchend', release, { passive: false });
+            });
+        }
+
+        function getKeyCodeFor(name) {
+            // standard gbajs keypad keycodes
+            switch (name) {
+                case 'A': return 90; // Z
+                case 'B': return 88; // X
+                case 'START': return 13; // Enter
+                case 'SELECT': return 220; // \
+                case 'UP': return 38;
+                case 'DOWN': return 40;
+                case 'LEFT': return 37;
+                case 'RIGHT': return 39;
+            }
+            return 0;
+        }
+
+        // HTML5 Gamepad API loop
+        function setupGamepadPolling() {
+            let lastButtons = {};
+            function pollGamepads() {
+                const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+                for (let i = 0; i < gamepads.length; i++) {
+                    const gp = gamepads[i];
+                    if (!gp) continue;
+
+                    // Standard gamepad mapping:
+                    // 0: A (Xbox A / PS X) -> GBA A (90)
+                    // 1: B (Xbox B / PS Circle) -> GBA B (88)
+                    // 4: L1 -> GBA L (65)
+                    // 5: R1 -> GBA R (83)
+                    // 8: Back/Select -> GBA Select (220)
+                    // 9: Start -> GBA Start (13)
+                    // 12: D-Up (38), 13: D-Down (40), 14: D-Left (37), 15: D-Right (39)
+                    const mapping = [
+                        { btn: 0, code: 90 },
+                        { btn: 1, code: 88 },
+                        { btn: 4, code: 65 },
+                        { btn: 5, code: 83 },
+                        { btn: 8, code: 220 },
+                        { btn: 9, code: 13 },
+                        { btn: 12, code: 38 },
+                        { btn: 13, code: 40 },
+                        { btn: 14, code: 37 },
+                        { btn: 15, code: 39 }
+                    ];
+
+                    mapping.forEach(m => {
+                        const pressed = gp.buttons[m.btn] && gp.buttons[m.btn].pressed;
+                        const keyId = `${gp.index}_${m.btn}`;
+                        if (pressed !== lastButtons[keyId]) {
+                            lastButtons[keyId] = pressed;
+                            if (gba && gba.keypad) {
+                                gba.keypad.keyboardHandler({
+                                    type: pressed ? 'keydown' : 'keyup',
+                                    keyCode: m.code,
+                                    preventDefault: () => {}
+                                });
+                            }
+                        }
+                    });
+                }
+                requestAnimationFrame(pollGamepads);
+            }
+            requestAnimationFrame(pollGamepads);
         }
 
         function escapeHtml(text) {
