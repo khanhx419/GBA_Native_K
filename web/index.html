@@ -171,12 +171,22 @@
             width: 100%;
             max-width: 720px;
             aspect-ratio: 3 / 2;
+            image-rendering: -webkit-optimize-contrast;
             image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
             image-rendering: pixelated;
             background: #000;
             border-radius: 12px;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
             display: none;
+        }
+
+        :fullscreen canvas#screen, :-webkit-full-screen canvas#screen {
+            max-width: none;
+            max-height: 88vh;
+            width: auto;
+            height: auto;
+            aspect-ratio: 3 / 2;
         }
 
         /* Drop Zone */
@@ -748,6 +758,13 @@
             canvas.style.display = 'block';
             touchControls.style.display = 'flex';
             romStatus.innerHTML = `<span>⏳ Đang nạp ROM: <strong>${escapeHtml(name)}</strong>...</span>`;
+
+            // Explicitly set buffer resolution to match 3:2 GBA ratio (480x320)
+            canvas.width = 480;
+            canvas.height = 320;
+            if (gba) {
+                gba.setCanvas(canvas);
+            }
 
             // Reset pause state
             btnPause.textContent = "⏸ Tạm dừng";
