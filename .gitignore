@@ -13,4 +13,5 @@ app/build/
 
 # Ignore debug APKs but keep release APK
 *.apk
+!GBA_Native_K_v*.apk
 !GBA_Native_K_Release.apk
