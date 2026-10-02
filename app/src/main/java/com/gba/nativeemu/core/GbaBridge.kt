@@ -1,8 +1,23 @@
 package com.gba.nativeemu.core
 
+import android.util.Log
+
 object GbaBridge {
+    var isLibraryLoaded: Boolean = false
+        private set
+    var loadError: String? = null
+        private set
+
     init {
-        System.loadLibrary("gba_native")
+        try {
+            System.loadLibrary("gba_native")
+            isLibraryLoaded = true
+            Log.i("GbaBridge", "libgba_native.so loaded successfully")
+        } catch (t: Throwable) {
+            isLibraryLoaded = false
+            loadError = t.message ?: t.toString()
+            Log.e("GbaBridge", "FATAL: Failed to load libgba_native.so: $loadError", t)
+        }
     }
 
     // GBA Key bitmasks

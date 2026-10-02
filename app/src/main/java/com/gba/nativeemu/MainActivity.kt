@@ -14,11 +14,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
 import com.gba.nativeemu.core.RomInfo
 import com.gba.nativeemu.core.RomManager
@@ -46,8 +51,14 @@ class MainActivity : ComponentActivity() {
         romManager = RomManager(this)
         saveRepository = SaveRepository(this)
 
-        // Initialize Native Core & Audio
-        GbaBridge.nativeInit(filesDir.absolutePath)
+        // Initialize Native Core & Audio safely
+        if (GbaBridge.isLibraryLoaded) {
+            try {
+                GbaBridge.nativeInit(filesDir.absolutePath)
+            } catch (t: Throwable) {
+                android.util.Log.e("MainActivity", "Error in nativeInit", t)
+            }
+        }
 
         // Check if opened via intent (e.g. user tapped a .gba file in file manager)
         handleIntent(intent)
@@ -58,6 +69,33 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = Color.Black
                 ) {
+                    if (!GbaBridge.isLibraryLoaded) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    "⚠️ Lỗi khởi tạo Engine Native",
+                                    color = Color(0xFFFF5252),
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    GbaBridge.loadError ?: "Không thể nạp libgba_native.so",
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                        return@Surface
+                    }
+
                     var isRomLoaded by remember { mutableStateOf(GbaBridge.nativeIsRomLoaded()) }
                     var currentTitle by remember { mutableStateOf(currentGameTitle ?: "GBA Game") }
                     val recentRoms = remember { mutableStateListOf<RomInfo>().apply { addAll(romManager.getRecentRoms()) } }
@@ -203,24 +241,30 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        currentGameTitle?.let { title ->
-            saveRepository.saveBattery(title)
+        if (GbaBridge.isLibraryLoaded) {
+            currentGameTitle?.let { title ->
+                saveRepository.saveBattery(title)
+            }
+            GbaBridge.nativeSetAudioMute(true)
         }
-        GbaBridge.nativeSetAudioMute(true)
     }
 
     override fun onResume() {
         super.onResume()
-        GbaBridge.nativeSetAudioMute(false)
+        if (GbaBridge.isLibraryLoaded) {
+            GbaBridge.nativeSetAudioMute(false)
+        }
         hideSystemUI()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        currentGameTitle?.let { title ->
-            saveRepository.saveBattery(title)
+        if (GbaBridge.isLibraryLoaded) {
+            currentGameTitle?.let { title ->
+                saveRepository.saveBattery(title)
+            }
+            GbaBridge.nativeDestroy()
         }
-        GbaBridge.nativeDestroy()
     }
 
     // Physical Bluetooth / USB Gamepad Controller Support
