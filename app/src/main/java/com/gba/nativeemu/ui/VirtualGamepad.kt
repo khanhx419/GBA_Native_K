@@ -38,12 +38,8 @@ fun VirtualGamepad(
     modifier: Modifier = Modifier,
     opacity: Float = 0.85f,
     fpsText: String,
-    gameTitle: String,
     isFastForward: Boolean,
-    onFastForwardToggle: () -> Unit,
     onMenuClick: () -> Unit,
-    onQuickSave: () -> Unit,
-    onQuickLoad: () -> Unit,
     onKeyMaskChanged: (Int) -> Unit
 ) {
     var dpadMask by remember { mutableStateOf(0) }
@@ -58,100 +54,20 @@ fun VirtualGamepad(
             .fillMaxSize()
             .alpha(opacity)
     ) {
-        // --- TOP HEADER (L/R SHOULDER BUTTONS, QUICK ACTIONS, AND STATUS) ---
-        Column(
+        // --- 1. TOP TOOLBAR (SINGLE TIER: FPS ON LEFT, SELECT & START & HAMBURGER MENU ON RIGHT) ---
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 8.dp, start = 12.dp, end = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Row 1: Shoulder buttons + Center Quick Action Toolbar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // L Button
-                GamepadButton(
-                    text = "L",
-                    modifier = Modifier
-                        .width(68.dp)
-                        .height(36.dp),
-                    shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp),
-                    color = Color(0xFF2C2C3E),
-                    onPressState = { pressed ->
-                        actionMask = if (pressed) actionMask or GbaBridge.KEY_L else actionMask and GbaBridge.KEY_L.inv()
-                    }
-                )
-
-                // Center Quick Action Toolbar
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onFastForwardToggle,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(if (isFastForward) Color(0xFFFF9100) else Color(0x66000000), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.FastForward,
-                            contentDescription = "Tua nhanh",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onQuickSave,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(Color(0x66000000), CircleShape)
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = "Lưu nhanh", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-
-                    IconButton(
-                        onClick = onQuickLoad,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(Color(0x66000000), CircleShape)
-                    ) {
-                        Icon(Icons.Default.Restore, contentDescription = "Tải nhanh", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-
-                    IconButton(
-                        onClick = onMenuClick,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(Color(0x66000000), CircleShape)
-                    ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                }
-
-                // R Button
-                GamepadButton(
-                    text = "R",
-                    modifier = Modifier
-                        .width(68.dp)
-                        .height(36.dp),
-                    shape = RoundedCornerShape(topEnd = 14.dp, bottomStart = 14.dp),
-                    color = Color(0xFF2C2C3E),
-                    onPressState = { pressed ->
-                        actionMask = if (pressed) actionMask or GbaBridge.KEY_R else actionMask and GbaBridge.KEY_R.inv()
-                    }
-                )
-            }
-
-            // Row 2: Status Badge (FPS, Mode & Game Title)
+            // Left: FPS & Thermal Status Badge
             Row(
                 modifier = Modifier
-                    .background(Color(0xCC14141E), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .background(Color(0xCC14141E), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -161,46 +77,16 @@ fun VirtualGamepad(
                         .background(if (isFastForward) Color(0xFFFF9100) else Color(0xFF00E676), CircleShape)
                 )
                 Text(
-                    fpsText,
+                    text = fpsText,
                     color = if (isFastForward) Color(0xFFFFB74D) else Color(0xFF00E676),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text("•", color = Color(0xFF666680), fontSize = 11.sp)
-                Text(
-                    gameTitle,
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    fontWeight = FontWeight.Medium
-                )
             }
-        }
 
-        // --- BOTTOM CONTROLS (DECOUPLED BOX TO PREVENT CLAMPING/SQUASHING) ---
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
-        ) {
-            // Left: Circular Precision D-Pad
-            CircularDPad(
-                modifier = Modifier
-                    .size(140.dp)
-                    .align(Alignment.BottomStart)
-                    .padding(start = 10.dp, bottom = 6.dp),
-                onDirectionChanged = { mask ->
-                    dpadMask = mask
-                }
-            )
-
-            // Center: Select and Start Buttons
+            // Right: SELECT, START, and Hamburger Menu (☰)
             Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PillButton(
@@ -216,14 +102,86 @@ fun VirtualGamepad(
                         actionMask = if (pressed) actionMask or GbaBridge.KEY_START else actionMask and GbaBridge.KEY_START.inv()
                     }
                 )
+
+                // Hamburger Menu Button (☰)
+                IconButton(
+                    onClick = onMenuClick,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(Color(0x992C2C3E), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
+        }
+
+        // --- 2. SHOULDER BUTTONS (L & R - POSITIONED JUST ABOVE CONTROLS / BELOW SCREEN) ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(start = 14.dp, end = 14.dp, bottom = 175.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // L Button
+            GamepadButton(
+                text = "L",
+                modifier = Modifier
+                    .width(72.dp)
+                    .height(36.dp),
+                shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp),
+                color = Color(0xFF2C2C3E),
+                fontSize = 15.sp,
+                onPressState = { pressed ->
+                    actionMask = if (pressed) actionMask or GbaBridge.KEY_L else actionMask and GbaBridge.KEY_L.inv()
+                }
+            )
+
+            // R Button
+            GamepadButton(
+                text = "R",
+                modifier = Modifier
+                    .width(72.dp)
+                    .height(36.dp),
+                shape = RoundedCornerShape(topEnd = 14.dp, bottomStart = 14.dp),
+                color = Color(0xFF2C2C3E),
+                fontSize = 15.sp,
+                onPressState = { pressed ->
+                    actionMask = if (pressed) actionMask or GbaBridge.KEY_R else actionMask and GbaBridge.KEY_R.inv()
+                }
+            )
+        }
+
+        // --- 3. LOWER CONTROLS (D-PAD & ACTION CLUSTER) ---
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp)
+        ) {
+            // Left: Circular Precision D-Pad
+            CircularDPad(
+                modifier = Modifier
+                    .size(140.dp)
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, bottom = 6.dp),
+                onDirectionChanged = { mask ->
+                    dpadMask = mask
+                }
+            )
 
             // Right: Action Buttons Cluster (B, A, Turbo B, Turbo A, Combo A+B)
             ActionButtonsCluster(
                 modifier = Modifier
                     .size(width = 140.dp, height = 155.dp)
                     .align(Alignment.BottomEnd)
-                    .padding(end = 10.dp, bottom = 6.dp),
+                    .padding(end = 12.dp, bottom = 6.dp),
                 onMaskChanged = { mask ->
                     actionMask = (actionMask and (GbaBridge.KEY_L or GbaBridge.KEY_R or GbaBridge.KEY_START or GbaBridge.KEY_SELECT)) or mask
                 }
@@ -507,35 +465,31 @@ fun PillButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+    Box(
         modifier = modifier
-    ) {
-        Box(
-            modifier = Modifier
-                .width(36.dp)
-                .height(16.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (isPressed) Color(0xFFB0B0B0) else Color(0xFF383848))
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        isPressed = true
-                        onPressState(true)
+            .width(48.dp)
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isPressed) Color(0xFF00E5FF) else Color(0x992C2C3E))
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    isPressed = true
+                    onPressState(true)
 
-                        eventStreamHasUpOrCancel(down.id)
-                        isPressed = false
-                        onPressState(false)
-                    }
+                    eventStreamHasUpOrCancel(down.id)
+                    isPressed = false
+                    onPressState(false)
                 }
-        )
+            },
+        contentAlignment = Alignment.Center
+    ) {
         Text(
             text = text,
-            color = Color(0xFFAAAAAA),
+            color = if (isPressed) Color.Black else Color(0xFFD0D0E0),
             fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.8.sp
         )
     }
 }

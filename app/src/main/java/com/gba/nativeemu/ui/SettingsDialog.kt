@@ -27,6 +27,8 @@ data class EmulatorSettings(
 @Composable
 fun SettingsDialog(
     settings: EmulatorSettings,
+    isFastForward: Boolean = false,
+    onToggleFastForward: () -> Unit = {},
     onSettingsChanged: (EmulatorSettings) -> Unit,
     onOpenSaveStates: () -> Unit,
     onOpenCheats: () -> Unit,
@@ -112,7 +114,17 @@ fun SettingsDialog(
                 }
 
                 // --- TỐC ĐỘ TUA NHANH ---
-                Text("Tốc độ tua nhanh: ${speed.toInt()}x", style = MaterialTheme.typography.titleSmall, color = Color(0xFFFF9100))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Tua nhanh (${speed.toInt()}x)", style = MaterialTheme.typography.titleSmall, color = Color(0xFFFF9100))
+                    Switch(
+                        checked = isFastForward,
+                        onCheckedChange = { onToggleFastForward() }
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)

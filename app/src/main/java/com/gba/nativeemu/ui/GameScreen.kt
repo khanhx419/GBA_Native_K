@@ -165,36 +165,24 @@ fun GameScreen(
             modifier = Modifier.fillMaxSize(),
             opacity = settings.gamepadOpacity,
             fpsText = fpsText,
-            gameTitle = gameTitle,
             isFastForward = isFastForward,
-            onFastForwardToggle = {
-                isFastForward = !isFastForward
-                GbaBridge.nativeSetFastForward(if (isFastForward) settings.fastForwardSpeed else 1.0f)
-                val status = if (isFastForward) "Tua nhanh ${settings.fastForwardSpeed.toInt()}x" else "Tốc độ chuẩn 1.0x"
-                Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
-            },
             onMenuClick = { showSettingsDialog = true },
-            onQuickSave = {
-                val ok = saveRepository.saveState(gameTitle, 1)
-                Toast.makeText(context, if (ok) "💾 Đã lưu nhanh (Slot 1)" else "❌ Lỗi lưu Slot 1", Toast.LENGTH_SHORT).show()
-            },
-            onQuickLoad = {
-                if (saveRepository.stateExists(gameTitle, 1)) {
-                    val ok = saveRepository.loadState(gameTitle, 1)
-                    Toast.makeText(context, if (ok) "⚡ Đã tải nhanh (Slot 1)" else "❌ Lỗi tải Slot 1", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Slot 1 chưa có dữ liệu lưu", Toast.LENGTH_SHORT).show()
-                }
-            },
             onKeyMaskChanged = { mask ->
                 currentKeyMask = mask
             }
         )
 
-        // --- 4. DIALOGS ---
+        // --- 3. DIALOGS ---
         if (showSettingsDialog) {
             SettingsDialog(
                 settings = settings,
+                isFastForward = isFastForward,
+                onToggleFastForward = {
+                    isFastForward = !isFastForward
+                    GbaBridge.nativeSetFastForward(if (isFastForward) settings.fastForwardSpeed else 1.0f)
+                    val status = if (isFastForward) "Tua nhanh ${settings.fastForwardSpeed.toInt()}x" else "Tốc độ chuẩn 1.0x"
+                    Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
+                },
                 onSettingsChanged = { newSettings ->
                     onSettingsChanged(newSettings)
                     GbaBridge.nativeSetAspectRatio(newSettings.aspectMode)
