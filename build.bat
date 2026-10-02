@@ -12,11 +12,11 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo Signing APK...
-call "%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0\apksigner.bat" sign --ks "%USERPROFILE%\.android\debug.keystore" --ks-pass pass:android --key-pass pass:android --out ".\GBA_Native_K_Release.apk" "app\build\outputs\apk\release\app-release-unsigned.apk"
+call "%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0\apksigner.bat" sign --ks "%USERPROFILE%\.android\debug.keystore" --ks-pass pass:android --key-pass pass:android --out ".\GBA_Native_K_v0.1.apk" "app\build\outputs\apk\release\app-release-unsigned.apk"
 
 echo.
 echo ====================================================
 echo  BUILD SUCCESSFUL!
-echo  APK: GBA_Native_K_Release.apk (Ready to install)
+echo  APK: GBA_Native_K_v0.1.apk (Ready to install)
 echo ====================================================
 pause
