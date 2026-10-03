@@ -1,16 +1,19 @@
 package com.gba.nativeemu.ui
 
 import android.content.Context
+import android.content.res.Configuration
 import android.opengl.GLSurfaceView
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -20,14 +23,19 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.gba.nativeemu.core.GbaBridge
+import com.gba.nativeemu.storage.CustomLayoutState
+import com.gba.nativeemu.storage.EmulatorSettings
 import com.gba.nativeemu.storage.SaveRepository
+import com.gba.nativeemu.storage.SettingsManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.roundToInt
 
 @Composable
 fun GameScreen(
     gameTitle: String,
     saveRepository: SaveRepository,
+    settingsManager: SettingsManager,
     settings: EmulatorSettings,
     onSettingsChanged: (EmulatorSettings) -> Unit,
     onResetGame: () -> Unit,
@@ -37,10 +45,19 @@ fun GameScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     var currentKeyMask by remember { mutableStateOf(0) }
     var isFastForward by remember { mutableStateOf(false) }
     var fpsText by remember { mutableStateOf("60 FPS • Mát máy") }
+
+    // Layout Customization State
+    var isEditingLayout by remember { mutableStateOf(false) }
+    var selectedElementId by remember { mutableStateOf("dpad") }
+    var layoutState by remember(isLandscape) {
+        mutableStateOf(settingsManager.loadLayout(isLandscape))
+    }
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSaveStateDialog by remember { mutableStateOf(false) }
@@ -166,13 +183,58 @@ fun GameScreen(
             opacity = settings.gamepadOpacity,
             fpsText = fpsText,
             isFastForward = isFastForward,
+            isLandscape = isLandscape,
+            layoutState = layoutState,
+            isEditingLayout = isEditingLayout,
+            selectedElementId = selectedElementId,
+            onSelectElement = { id -> selectedElementId = id },
+            onMoveElement = { id, dx, dy ->
+                layoutState = layoutState.updateElement(id) {
+                    it.copy(offsetX = it.offsetX + dx, offsetY = it.offsetY + dy)
+                }
+            },
             onMenuClick = { showSettingsDialog = true },
             onKeyMaskChanged = { mask ->
                 currentKeyMask = mask
             }
         )
 
-        // --- 3. DIALOGS ---
+        // --- 3. LAYOUT EDITOR HUD OVERLAY ---
+        if (isEditingLayout) {
+            LayoutEditorOverlay(
+                isLandscape = isLandscape,
+                selectedElementId = selectedElementId,
+                currentScale = layoutState.getElement(selectedElementId).scale,
+                onSelectElement = { selectedElementId = it },
+                onDecreaseScale = {
+                    val current = layoutState.getElement(selectedElementId)
+                    val newScale = ((current.scale - 0.1f) * 10f).roundToInt() / 10f
+                    val clampedScale = newScale.coerceIn(0.6f, 1.6f)
+                    layoutState = layoutState.updateElement(selectedElementId) { it.copy(scale = clampedScale) }
+                },
+                onIncreaseScale = {
+                    val current = layoutState.getElement(selectedElementId)
+                    val newScale = ((current.scale + 0.1f) * 10f).roundToInt() / 10f
+                    val clampedScale = newScale.coerceIn(0.6f, 1.6f)
+                    layoutState = layoutState.updateElement(selectedElementId) { it.copy(scale = clampedScale) }
+                },
+                onResetLayout = {
+                    layoutState = CustomLayoutState()
+                    Toast.makeText(context, "Đã đặt lại vị trí & cỡ mặc định", Toast.LENGTH_SHORT).show()
+                },
+                onCancelEditing = {
+                    layoutState = settingsManager.loadLayout(isLandscape)
+                    isEditingLayout = false
+                },
+                onSaveLayout = {
+                    settingsManager.saveLayout(isLandscape, layoutState)
+                    isEditingLayout = false
+                    Toast.makeText(context, "✅ Đã lưu bố cục phím!", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+
+        // --- 4. DIALOGS ---
         if (showSettingsDialog) {
             SettingsDialog(
                 settings = settings,
@@ -196,6 +258,10 @@ fun GameScreen(
                 onOpenCheats = {
                     showSettingsDialog = false
                     showCheatDialog = true
+                },
+                onOpenLayoutEditor = {
+                    showSettingsDialog = false
+                    isEditingLayout = true
                 },
                 onResetGame = {
                     GbaBridge.nativeReset()
@@ -249,6 +315,170 @@ fun GameScreen(
                 },
                 onDismiss = { showCheatDialog = false }
             )
+        }
+    }
+}
+
+@Composable
+fun LayoutEditorOverlay(
+    isLandscape: Boolean,
+    selectedElementId: String,
+    currentScale: Float,
+    onSelectElement: (String) -> Unit,
+    onDecreaseScale: () -> Unit,
+    onIncreaseScale: () -> Unit,
+    onResetLayout: () -> Unit,
+    onCancelEditing: () -> Unit,
+    onSaveLayout: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = if (isLandscape) 8.dp else 40.dp, start = 12.dp, end = 12.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.85f else 1.0f)
+                .wrapContentHeight(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xF2161624)),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.5.dp, Color(0xFF00E5FF))
+        ) {
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Row 1: Title and Hint
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "🎮 CHỈNH BỐ CỤC PHÍM",
+                            color = Color(0xFF00E5FF),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isLandscape) "(Ngang)" else "(Dọc)",
+                            color = Color(0xFFAAAAAA),
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text(
+                        text = "👆 Kéo phím trên màn hình",
+                        color = Color(0xFFFFD54F),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Row 2: Element Selector Chips
+                val elements = listOf(
+                    "dpad" to "D-Pad",
+                    "actions" to "Nút A/B",
+                    "shoulder_l" to "Nút L",
+                    "shoulder_r" to "Nút R",
+                    "select_start" to "Select/Start"
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    elements.forEach { (id, label) ->
+                        FilterChip(
+                            selected = selectedElementId == id,
+                            onClick = { onSelectElement(id) },
+                            label = { Text(label, fontSize = 10.sp) },
+                            modifier = Modifier.weight(1f),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF00B0FF),
+                                selectedLabelColor = Color.Black
+                            )
+                        )
+                    }
+                }
+
+                // Row 3: Scale Adjustment and Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Scale Controls: [-] 100% [+]
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("Cỡ:", fontSize = 11.sp, color = Color.White)
+                        IconButton(
+                            onClick = onDecreaseScale,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color(0xFF2C2C3E), RoundedCornerShape(6.dp))
+                        ) {
+                            Text("-", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFF1E1E28), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val scalePercent = (currentScale * 100).roundToInt()
+                            Text(
+                                "$scalePercent%",
+                                color = Color(0xFF00E5FF),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        IconButton(
+                            onClick = onIncreaseScale,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color(0xFF2C2C3E), RoundedCornerShape(6.dp))
+                        ) {
+                            Text("+", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+
+                    // Action Buttons: Đặt lại, Hủy, Lưu
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(
+                            onClick = onResetLayout,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("Đặt lại", fontSize = 10.sp, color = Color(0xFFFFB74D))
+                        }
+
+                        OutlinedButton(
+                            onClick = onCancelEditing,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("Hủy", fontSize = 10.sp, color = Color.White)
+                        }
+
+                        Button(
+                            onClick = onSaveLayout,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("LƯU", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.gba.nativeemu
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -27,7 +28,9 @@ import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
 import com.gba.nativeemu.core.RomInfo
 import com.gba.nativeemu.core.RomManager
+import com.gba.nativeemu.storage.EmulatorSettings
 import com.gba.nativeemu.storage.SaveRepository
+import com.gba.nativeemu.storage.SettingsManager
 import com.gba.nativeemu.ui.*
 import com.gba.nativeemu.ui.theme.GbaNativeTheme
 import java.io.File
@@ -36,6 +39,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var romManager: RomManager
     private lateinit var saveRepository: SaveRepository
+    private lateinit var settingsManager: SettingsManager
     private var currentGameTitle: String? = null
     private var physicalKeyMask = 0
 
@@ -48,6 +52,7 @@ class MainActivity : ComponentActivity() {
 
             romManager = RomManager(this)
             saveRepository = SaveRepository(this)
+            settingsManager = SettingsManager(this)
 
             // Initialize Native Core & Audio safely
             if (GbaBridge.isLibraryLoaded) {
@@ -100,7 +105,16 @@ class MainActivity : ComponentActivity() {
                     var isRomLoaded by remember { mutableStateOf(GbaBridge.nativeIsRomLoaded()) }
                     var currentTitle by remember { mutableStateOf(currentGameTitle ?: "GBA Game") }
                     val recentRoms = remember { mutableStateListOf<RomInfo>().apply { addAll(romManager.getRecentRoms()) } }
-                    var settings by remember { mutableStateOf(EmulatorSettings()) }
+                    var settings by remember { mutableStateOf(settingsManager.loadSettings()) }
+
+                    // Apply requested screen orientation whenever orientationMode changes
+                    LaunchedEffect(settings.orientationMode) {
+                        requestedOrientation = when (settings.orientationMode) {
+                            EmulatorSettings.ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            EmulatorSettings.ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        }
+                    }
 
                     // SAF Launcher for Opening ROM
                     val openRomLauncher = rememberLauncherForActivityResult(
@@ -152,8 +166,12 @@ class MainActivity : ComponentActivity() {
                         GameScreen(
                             gameTitle = currentTitle,
                             saveRepository = saveRepository,
+                            settingsManager = settingsManager,
                             settings = settings,
-                            onSettingsChanged = { settings = it },
+                            onSettingsChanged = { newSettings ->
+                                settings = newSettings
+                                settingsManager.saveSettings(newSettings)
+                            },
                             onResetGame = {
                                 if (currentGameTitle != null) {
                                     saveRepository.loadBattery(currentGameTitle!!)

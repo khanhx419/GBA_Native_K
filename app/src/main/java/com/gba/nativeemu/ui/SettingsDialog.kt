@@ -15,14 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
-
-data class EmulatorSettings(
-    val aspectMode: Int = GbaBridge.ASPECT_FIT,
-    val fastForwardSpeed: Float = 2.0f,
-    val volume: Float = 1.0f,
-    val isMuted: Boolean = false,
-    val gamepadOpacity: Float = 0.85f
-)
+import com.gba.nativeemu.storage.EmulatorSettings
 
 @Composable
 fun SettingsDialog(
@@ -32,6 +25,7 @@ fun SettingsDialog(
     onSettingsChanged: (EmulatorSettings) -> Unit,
     onOpenSaveStates: () -> Unit,
     onOpenCheats: () -> Unit,
+    onOpenLayoutEditor: () -> Unit,
     onResetGame: () -> Unit,
     onCloseRom: () -> Unit,
     onDismiss: () -> Unit
@@ -41,6 +35,7 @@ fun SettingsDialog(
     var vol by remember { mutableStateOf(settings.volume) }
     var muted by remember { mutableStateOf(settings.isMuted) }
     var opacity by remember { mutableStateOf(settings.gamepadOpacity) }
+    var orientation by remember { mutableStateOf(settings.orientationMode) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -86,10 +81,46 @@ fun SettingsDialog(
                     }
                 }
 
+                // --- TÙY CHỈNH VỊ TRÍ PHÍM BẤM ---
+                Button(
+                    onClick = onOpenLayoutEditor,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E3A8A)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("🎮 Chỉnh vị trí & kích thước phím", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+
                 HorizontalDivider(color = Color(0x33FFFFFF))
 
+                // --- HƯỚNG MÀN HÌNH (XOAY TỰ DO / KHÓA DỌC / KHÓA NGANG) ---
+                Text("Hướng màn hình", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val orientations = listOf(
+                        "🔄 Tự do" to EmulatorSettings.ORIENTATION_AUTO,
+                        "📱 Cố định Dọc" to EmulatorSettings.ORIENTATION_PORTRAIT,
+                        "🖥️ Cố định Ngang" to EmulatorSettings.ORIENTATION_LANDSCAPE
+                    )
+                    orientations.forEach { (name, value) ->
+                        FilterChip(
+                            selected = orientation == value,
+                            onClick = {
+                                orientation = value
+                                onSettingsChanged(settings.copy(orientationMode = value))
+                            },
+                            label = { Text(name, fontSize = 10.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
                 // --- TỈ LỆ KHUNG HÌNH (ASPECT RATIO) ---
-                Text("Tỉ lệ màn hình", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
+                Text("Tỉ lệ khung hình game", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
