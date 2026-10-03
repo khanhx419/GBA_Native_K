@@ -36,6 +36,7 @@ fun SettingsDialog(
     var muted by remember { mutableStateOf(settings.isMuted) }
     var opacity by remember { mutableStateOf(settings.gamepadOpacity) }
     var orientation by remember { mutableStateOf(settings.orientationMode) }
+    var hideControls by remember { mutableStateOf(settings.hideGamepad) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -119,6 +120,26 @@ fun SettingsDialog(
                     }
                 }
 
+                // --- CHẾ ĐỘ TOÀN MÀN HÌNH (FULL SCREEN) ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Chế độ Toàn màn hình (Full Screen)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
+                        Text("Kéo dãn tràn viền toàn bộ màn hình", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                    }
+                    Switch(
+                        checked = aspect == GbaBridge.ASPECT_STRETCH,
+                        onCheckedChange = { isFull ->
+                            val newAspect = if (isFull) GbaBridge.ASPECT_STRETCH else GbaBridge.ASPECT_FIT
+                            aspect = newAspect
+                            onSettingsChanged(settings.copy(aspectMode = newAspect))
+                        }
+                    )
+                }
+
                 // --- TỈ LỆ KHUNG HÌNH (ASPECT RATIO) ---
                 Text("Tỉ lệ khung hình game", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
                 Row(
@@ -127,7 +148,7 @@ fun SettingsDialog(
                 ) {
                     val aspects = listOf(
                         "Gốc 3:2" to GbaBridge.ASPECT_FIT,
-                        "Kéo dãn" to GbaBridge.ASPECT_STRETCH,
+                        "Toàn màn hình" to GbaBridge.ASPECT_STRETCH,
                         "1x" to GbaBridge.ASPECT_1X,
                         "2x" to GbaBridge.ASPECT_2X
                     )
@@ -207,6 +228,25 @@ fun SettingsDialog(
                     },
                     valueRange = 0.2f..1.0f
                 )
+
+                // --- ẨN PHÍM ẢO (TOÀN MÀN HÌNH GAME) ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Ẩn phím ảo (Toàn màn hình game)", style = MaterialTheme.typography.titleSmall)
+                        Text("Dành cho tay cầm Bluetooth hoặc hiển thị 100% video", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                    }
+                    Switch(
+                        checked = hideControls,
+                        onCheckedChange = { checked ->
+                            hideControls = checked
+                            onSettingsChanged(settings.copy(hideGamepad = checked))
+                        }
+                    )
+                }
 
                 HorizontalDivider(color = Color(0x33FFFFFF))
 

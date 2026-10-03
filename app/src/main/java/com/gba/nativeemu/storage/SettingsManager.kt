@@ -46,7 +46,8 @@ data class EmulatorSettings(
     val volume: Float = 1.0f,
     val isMuted: Boolean = false,
     val gamepadOpacity: Float = 0.85f,
-    val orientationMode: Int = ORIENTATION_AUTO
+    val orientationMode: Int = ORIENTATION_AUTO,
+    val hideGamepad: Boolean = false
 ) {
     companion object {
         const val ORIENTATION_AUTO = 0
@@ -65,6 +66,7 @@ class SettingsManager(context: Context) {
         private const val KEY_MUTED = "setting_is_muted"
         private const val KEY_OPACITY = "setting_gamepad_opacity"
         private const val KEY_ORIENTATION = "setting_orientation_mode"
+        private const val KEY_HIDE_GAMEPAD = "setting_hide_gamepad"
     }
 
     fun loadSettings(): EmulatorSettings {
@@ -74,7 +76,8 @@ class SettingsManager(context: Context) {
             volume = prefs.getFloat(KEY_VOLUME, 1.0f),
             isMuted = prefs.getBoolean(KEY_MUTED, false),
             gamepadOpacity = prefs.getFloat(KEY_OPACITY, 0.85f),
-            orientationMode = prefs.getInt(KEY_ORIENTATION, EmulatorSettings.ORIENTATION_AUTO)
+            orientationMode = prefs.getInt(KEY_ORIENTATION, EmulatorSettings.ORIENTATION_AUTO),
+            hideGamepad = prefs.getBoolean(KEY_HIDE_GAMEPAD, false)
         )
     }
 
@@ -86,6 +89,7 @@ class SettingsManager(context: Context) {
             .putBoolean(KEY_MUTED, settings.isMuted)
             .putFloat(KEY_OPACITY, settings.gamepadOpacity)
             .putInt(KEY_ORIENTATION, settings.orientationMode)
+            .putBoolean(KEY_HIDE_GAMEPAD, settings.hideGamepad)
             .apply()
     }
 

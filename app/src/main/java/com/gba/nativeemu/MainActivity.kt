@@ -50,6 +50,12 @@ class MainActivity : ComponentActivity() {
             // Keep screen on during gameplay
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+            // True edge-to-edge full screen across camera notch / display cutout
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                window.attributes.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+
             romManager = RomManager(this)
             saveRepository = SaveRepository(this)
             settingsManager = SettingsManager(this)

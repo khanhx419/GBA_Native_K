@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +49,9 @@ fun VirtualGamepad(
     layoutState: CustomLayoutState = CustomLayoutState(),
     isEditingLayout: Boolean = false,
     selectedElementId: String = "dpad",
+    isFullScreen: Boolean = false,
+    hideGamepad: Boolean = false,
+    onToggleFullScreen: () -> Unit = {},
     onSelectElement: (String) -> Unit = {},
     onMoveElement: (String, Float, Float) -> Unit = { _, _, _ -> },
     onMenuClick: () -> Unit,
@@ -134,6 +139,24 @@ fun VirtualGamepad(
                         )
                     }
 
+                    // Full Screen Toggle Button (⛶)
+                    IconButton(
+                        onClick = onToggleFullScreen,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(
+                                if (isFullScreen) Color(0xCC00838F) else Color(0x992C2C3E),
+                                RoundedCornerShape(8.dp)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            contentDescription = if (isFullScreen) "Thu nhỏ 3:2" else "Toàn màn hình",
+                            tint = if (isFullScreen) Color(0xFF00E5FF) else Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     // Hamburger Menu Button (☰ - Fixed)
                     IconButton(
                         onClick = onMenuClick,
@@ -151,7 +174,8 @@ fun VirtualGamepad(
                 }
             }
 
-            // 2. Shoulder Buttons (L & R - Positioned above DPad / Action buttons)
+            if (!hideGamepad || isEditingLayout) {
+                // 2. Shoulder Buttons (L & R - Positioned above DPad / Action buttons)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -258,70 +282,93 @@ fun VirtualGamepad(
                     }
                 )
             }
-        } else {
-            // ==================== LANDSCAPE MODE ====================
-            // 1. Top Toolbar (FPS on left, Select & Start in middle, Menu on right)
+        }
+    } else {
+        // ==================== LANDSCAPE MODE ====================
+        // 1. Top Toolbar (FPS on left, Select & Start in middle, Menu on right)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 20.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: FPS & Thermal Status Badge
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .padding(horizontal = 20.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .background(Color(0xCC14141E), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(if (isFastForward) Color(0xFFFF9100) else Color(0xFF00E676), CircleShape)
+                )
+                Text(
+                    text = fpsText,
+                    color = if (isFastForward) Color(0xFFFFB74D) else Color(0xFF00E676),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Center: SELECT & START (Draggable & Editable)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.layoutElementModifier(
+                    layout = layoutState.selectStart,
+                    elementId = "select_start",
+                    isEditing = isEditingLayout,
+                    isSelected = selectedElementId == "select_start",
+                    shape = RoundedCornerShape(14.dp),
+                    onSelect = onSelectElement,
+                    onMove = onMoveElement
+                )
+            ) {
+                PillButton(
+                    text = "SELECT",
+                    isEditing = isEditingLayout,
+                    onPressState = { pressed ->
+                        actionMask = if (pressed) actionMask or GbaBridge.KEY_SELECT else actionMask and GbaBridge.KEY_SELECT.inv()
+                    }
+                )
+
+                PillButton(
+                    text = "START",
+                    isEditing = isEditingLayout,
+                    onPressState = { pressed ->
+                        actionMask = if (pressed) actionMask or GbaBridge.KEY_START else actionMask and GbaBridge.KEY_START.inv()
+                    }
+                )
+            }
+
+            // Right: Fullscreen Toggle and Hamburger Menu Button (☰)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: FPS & Thermal Status Badge
-                Row(
+                // Full Screen Toggle Button (⛶)
+                IconButton(
+                    onClick = onToggleFullScreen,
                     modifier = Modifier
-                        .background(Color(0xCC14141E), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .size(34.dp)
+                        .background(
+                            if (isFullScreen) Color(0xCC00838F) else Color(0x992C2C3E),
+                            RoundedCornerShape(8.dp)
+                        )
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .background(if (isFastForward) Color(0xFFFF9100) else Color(0xFF00E676), CircleShape)
-                    )
-                    Text(
-                        text = fpsText,
-                        color = if (isFastForward) Color(0xFFFFB74D) else Color(0xFF00E676),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        contentDescription = if (isFullScreen) "Thu nhỏ 3:2" else "Toàn màn hình",
+                        tint = if (isFullScreen) Color(0xFF00E5FF) else Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                // Center: SELECT & START (Draggable & Editable)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.layoutElementModifier(
-                        layout = layoutState.selectStart,
-                        elementId = "select_start",
-                        isEditing = isEditingLayout,
-                        isSelected = selectedElementId == "select_start",
-                        shape = RoundedCornerShape(14.dp),
-                        onSelect = onSelectElement,
-                        onMove = onMoveElement
-                    )
-                ) {
-                    PillButton(
-                        text = "SELECT",
-                        isEditing = isEditingLayout,
-                        onPressState = { pressed ->
-                            actionMask = if (pressed) actionMask or GbaBridge.KEY_SELECT else actionMask and GbaBridge.KEY_SELECT.inv()
-                        }
-                    )
-
-                    PillButton(
-                        text = "START",
-                        isEditing = isEditingLayout,
-                        onPressState = { pressed ->
-                            actionMask = if (pressed) actionMask or GbaBridge.KEY_START else actionMask and GbaBridge.KEY_START.inv()
-                        }
-                    )
-                }
-
-                // Right: Hamburger Menu Button (☰ - Fixed)
                 IconButton(
                     onClick = onMenuClick,
                     modifier = Modifier
@@ -336,7 +383,9 @@ fun VirtualGamepad(
                     )
                 }
             }
+        }
 
+        if (!hideGamepad || isEditingLayout) {
             // 2. Shoulder L Button (Top-Left in Landscape)
             GamepadButton(
                 text = "L",
@@ -432,6 +481,7 @@ fun VirtualGamepad(
             )
         }
     }
+}
 }
 
 @Composable
