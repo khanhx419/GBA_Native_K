@@ -49,7 +49,9 @@ fun GameScreen(
     onResetGame: () -> Unit,
     onCloseRom: () -> Unit,
     onExportBattery: () -> Unit,
-    onImportBattery: () -> Unit
+    onImportBattery: () -> Unit,
+    onExportJson: () -> Unit = {},
+    onImportJson: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -334,8 +336,14 @@ fun GameScreen(
                     val ok = saveRepository.loadState(gameTitle, slot)
                     Toast.makeText(context, if (ok) "⚡ Đã tải Slot $slot" else "❌ Lỗi tải", Toast.LENGTH_SHORT).show()
                 },
+                onDeleteState = { slot ->
+                    val ok = saveRepository.deleteState(gameTitle, slot)
+                    Toast.makeText(context, if (ok) "🗑️ Đã xóa Slot $slot" else "❌ Lỗi xóa", Toast.LENGTH_SHORT).show()
+                },
                 onExportBattery = onExportBattery,
                 onImportBattery = onImportBattery,
+                onExportJson = onExportJson,
+                onImportJson = onImportJson,
                 onDismiss = { showSaveStateDialog = false }
             )
         }

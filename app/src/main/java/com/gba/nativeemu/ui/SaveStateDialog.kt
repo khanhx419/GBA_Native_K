@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.*
@@ -25,8 +26,11 @@ fun SaveStateDialog(
     saveRepository: SaveRepository,
     onSaveState: (Int) -> Unit,
     onLoadState: (Int) -> Unit,
+    onDeleteState: (Int) -> Unit,
     onExportBattery: () -> Unit,
     onImportBattery: () -> Unit,
+    onExportJson: () -> Unit,
+    onImportJson: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var message by remember { mutableStateOf<String?>(null) }
@@ -86,7 +90,10 @@ fun SaveStateDialog(
                                 }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Button(
                                     onClick = {
                                         onSaveState(slot)
@@ -111,6 +118,24 @@ fun SaveStateDialog(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text("TẢI", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                if (exists) {
+                                    IconButton(
+                                        onClick = {
+                                            onDeleteState(slot)
+                                            refreshTrigger++
+                                            message = "🗑️ Đã xóa Vị trí $slot"
+                                        },
+                                        modifier = Modifier.size(32.dp),
+                                        colors = IconButtonDefaults.iconButtonColors(contentColor = Color(0xFFEF5350))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Xóa slot $slot",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -148,6 +173,42 @@ fun SaveStateDialog(
                         Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Nhập .sav", fontSize = 12.sp)
+                    }
+                }
+
+                HorizontalDivider(color = Color(0x33FFFFFF), modifier = Modifier.padding(vertical = 4.dp))
+
+                Text("Sao lưu toàn diện dạng JSON (.json)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
+                Text(
+                    "Xuất trọn gói dữ liệu game: bố cục phím (dọc & ngang), cài đặt, file save pin và toàn bộ các slot save state vào 1 file JSON duy nhất.",
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onExportJson,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Xuất .json", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onImportJson,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF))
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Nhập .json", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

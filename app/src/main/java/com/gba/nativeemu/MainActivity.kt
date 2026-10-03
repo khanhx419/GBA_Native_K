@@ -168,6 +168,49 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // SAF Launcher for Exporting .json
+                    val exportJsonLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.CreateDocument("application/json")
+                    ) { uri: Uri? ->
+                        val title = currentGameTitle
+                        if (uri != null && title != null) {
+                            val layoutPortrait = settingsManager.loadLayout(false)
+                            val layoutLandscape = settingsManager.loadLayout(true)
+                            val ok = saveRepository.exportAllDataToJsonUri(title, uri, settings, layoutPortrait, layoutLandscape)
+                            Toast.makeText(
+                                this@MainActivity,
+                                if (ok) "✅ Đã xuất dữ liệu JSON thành công!" else "❌ Lỗi xuất file JSON",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+
+                    // SAF Launcher for Importing .json
+                    val importJsonLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument()
+                    ) { uri: Uri? ->
+                        val title = currentGameTitle
+                        if (uri != null && title != null) {
+                            val res = saveRepository.importAllDataFromJsonUri(title, uri)
+                            if (res.success) {
+                                res.newSettings?.let {
+                                    settings = it
+                                    settingsManager.saveSettings(it)
+                                }
+                                res.newLayoutPortrait?.let { settingsManager.saveLayout(false, it) }
+                                res.newLayoutLandscape?.let { settingsManager.saveLayout(true, it) }
+                                val statusMsg = buildString {
+                                    append("✅ Đã khôi phục dữ liệu từ JSON!")
+                                    if (res.batteryRestored) append(" (Có file Pin .sav)")
+                                    if (res.statesRestoredCount > 0) append(" (${res.statesRestoredCount} Save slot)")
+                                }
+                                Toast.makeText(this@MainActivity, statusMsg, Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(this@MainActivity, "❌ Lỗi nhập file JSON", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+
                     if (isRomLoaded) {
                         GameScreen(
                             gameTitle = currentTitle,
@@ -192,6 +235,12 @@ class MainActivity : ComponentActivity() {
                             },
                             onImportBattery = {
                                 importSaveLauncher.launch(arrayOf("*/*"))
+                            },
+                            onExportJson = {
+                                exportJsonLauncher.launch("${currentTitle}_backup.json")
+                            },
+                            onImportJson = {
+                                importJsonLauncher.launch(arrayOf("application/json", "*/*"))
                             }
                         )
                     } else {
