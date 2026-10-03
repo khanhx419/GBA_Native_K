@@ -146,11 +146,39 @@ void VideoRenderer::setViewport(int width, int height) {
 void VideoRenderer::calculateViewport() {
     if (mScreenWidth <= 0 || mScreenHeight <= 0) return;
 
-    if (mAspectMode == ASPECT_RATIO_STRETCH) {
+    if (mAspectMode == ASPECT_RATIO_STRETCH_FULL) {
         mViewportX = 0;
         mViewportY = 0;
         mViewportWidth = mScreenWidth;
         mViewportHeight = mScreenHeight;
+    } else if (mAspectMode == ASPECT_RATIO_STRETCH) {
+        // Safe Fullscreen: Narrows the two sides to 16:9 ratio in landscape mode
+        // This expands the screen immersively without touching the camera notch / punch hole
+        // and keeps the aspect ratio natural without severe horizontal stretching!
+        float targetAspect = 16.0f / 9.0f; // 1.7778f
+        float screenAspect = static_cast<float>(mScreenWidth) / static_cast<float>(mScreenHeight);
+
+        if (screenAspect > targetAspect) {
+            // Ultra-wide phone screen: Inset 2 sides to clean 16:9
+            mViewportHeight = mScreenHeight;
+            mViewportWidth = static_cast<int>(mScreenHeight * targetAspect);
+            mViewportX = (mScreenWidth - mViewportWidth) / 2;
+            mViewportY = 0;
+        } else if (screenAspect > 1.5f) {
+            // Screen between 3:2 and 16:9: Inset 5% on each side for safety
+            int sideMargin = static_cast<int>(mScreenWidth * 0.05f);
+            mViewportX = sideMargin;
+            mViewportY = 0;
+            mViewportWidth = mScreenWidth - 2 * sideMargin;
+            mViewportHeight = mScreenHeight;
+        } else {
+            // Portrait mode: Fit width with true 3:2 GBA ratio
+            float gbaAspect = 3.0f / 2.0f;
+            mViewportWidth = mScreenWidth;
+            mViewportHeight = static_cast<int>(mScreenWidth / gbaAspect);
+            mViewportX = 0;
+            mViewportY = (mScreenHeight - mViewportHeight) / 2;
+        }
     } else if (mAspectMode == ASPECT_RATIO_1X) {
         mViewportWidth = GBA_WIDTH;
         mViewportHeight = GBA_HEIGHT;

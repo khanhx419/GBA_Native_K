@@ -186,15 +186,22 @@ fun GameScreen(
             isLandscape = isLandscape,
             layoutState = layoutState,
             isEditingLayout = isEditingLayout,
-            selectedElementId = selectedElementId,
-            isFullScreen = settings.aspectMode == GbaBridge.ASPECT_STRETCH,
+            isFullScreen = settings.aspectMode == GbaBridge.ASPECT_STRETCH || settings.aspectMode == GbaBridge.ASPECT_FULL,
             hideGamepad = settings.hideGamepad,
             onToggleFullScreen = {
-                val newAspect = if (settings.aspectMode == GbaBridge.ASPECT_STRETCH) GbaBridge.ASPECT_FIT else GbaBridge.ASPECT_STRETCH
+                val newAspect = if (settings.aspectMode == GbaBridge.ASPECT_STRETCH || settings.aspectMode == GbaBridge.ASPECT_FULL) {
+                    GbaBridge.ASPECT_FIT
+                } else {
+                    GbaBridge.ASPECT_STRETCH
+                }
                 val newSettings = settings.copy(aspectMode = newAspect)
                 onSettingsChanged(newSettings)
                 GbaBridge.nativeSetAspectRatio(newAspect)
-                val msg = if (newAspect == GbaBridge.ASPECT_STRETCH) "🖥️ Đã bật Chế độ Toàn màn hình (Tràn viền)" else "📱 Đã bật Chế độ Tỉ lệ chuẩn (3:2)"
+                val msg = if (newAspect == GbaBridge.ASPECT_STRETCH) {
+                    "🖥️ Toàn màn hình (Thu hẹp 2 bên, tránh tai thỏ)"
+                } else {
+                    "📱 Chế độ Tỉ lệ chuẩn (3:2)"
+                }
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             },
             onSelectElement = { id -> selectedElementId = id },

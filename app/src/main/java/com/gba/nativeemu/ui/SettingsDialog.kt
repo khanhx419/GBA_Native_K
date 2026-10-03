@@ -127,8 +127,8 @@ fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Chế độ Toàn màn hình (Full Screen)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
-                        Text("Kéo dãn tràn viền toàn bộ màn hình", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        Text("Toàn màn hình (Thu hẹp 2 bên)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
+                        Text("Tỉ lệ 16:9, chừa lề an toàn tránh tai thỏ & nốt ruồi", fontSize = 11.sp, color = Color(0xFFAAAAAA))
                     }
                     Switch(
                         checked = aspect == GbaBridge.ASPECT_STRETCH,
@@ -148,7 +148,8 @@ fun SettingsDialog(
                 ) {
                     val aspects = listOf(
                         "Gốc 3:2" to GbaBridge.ASPECT_FIT,
-                        "Toàn màn hình" to GbaBridge.ASPECT_STRETCH,
+                        "Thu hẹp 2 bên" to GbaBridge.ASPECT_STRETCH,
+                        "Tràn 100%" to GbaBridge.ASPECT_FULL,
                         "1x" to GbaBridge.ASPECT_1X,
                         "2x" to GbaBridge.ASPECT_2X
                     )
@@ -159,7 +160,7 @@ fun SettingsDialog(
                                 aspect = value
                                 onSettingsChanged(settings.copy(aspectMode = value))
                             },
-                            label = { Text(name, fontSize = 11.sp) },
+                            label = { Text(name, fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                     }

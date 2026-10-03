@@ -39,11 +39,12 @@ object GbaBridge {
     const val FILTER_CRT = 3
 
     // Aspect Ratio modes
-    const val ASPECT_FIT = 0
-    const val ASPECT_STRETCH = 1
+    const val ASPECT_FIT = 0      // Gốc 3:2
+    const val ASPECT_STRETCH = 1  // Toàn màn hình an toàn (Thu hẹp 2 bên 16:9, tránh tai thỏ)
     const val ASPECT_1X = 2
     const val ASPECT_2X = 3
     const val ASPECT_3X = 4
+    const val ASPECT_FULL = 5    // Tràn viền 100% cực đại
 
     // Cheat formats
     const val CHEAT_AUTODETECT = 0

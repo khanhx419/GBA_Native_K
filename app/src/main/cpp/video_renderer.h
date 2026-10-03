@@ -12,11 +12,12 @@ enum VideoFilter {
 };
 
 enum AspectRatioMode {
-    ASPECT_RATIO_FIT = 0,     // 3:2 maintain aspect ratio with letterboxing
-    ASPECT_RATIO_STRETCH = 1, // Stretch to full screen
-    ASPECT_RATIO_1X = 2,      // 240x160
-    ASPECT_RATIO_2X = 3,      // 480x320
-    ASPECT_RATIO_3X = 4       // 720x480
+    ASPECT_RATIO_FIT = 0,          // 3:2 maintain aspect ratio with letterboxing
+    ASPECT_RATIO_STRETCH = 1,      // Safe Fullscreen (16:9 narrowed on 2 sides to avoid notch & distortion)
+    ASPECT_RATIO_1X = 2,           // 240x160
+    ASPECT_RATIO_2X = 3,           // 480x320
+    ASPECT_RATIO_3X = 4,           // 720x480
+    ASPECT_RATIO_STRETCH_FULL = 5  // Extreme 100% stretch edge-to-edge
 };
 
 class VideoRenderer {

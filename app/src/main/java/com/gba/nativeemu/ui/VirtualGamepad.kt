@@ -69,6 +69,7 @@ fun VirtualGamepad(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .displayCutoutPadding()
             .alpha(if (isEditingLayout) 1.0f else opacity)
     ) {
         if (!isLandscape) {
