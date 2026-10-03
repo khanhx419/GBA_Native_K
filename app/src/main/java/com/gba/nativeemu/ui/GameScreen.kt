@@ -7,6 +7,8 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +29,9 @@ import com.gba.nativeemu.storage.CustomLayoutState
 import com.gba.nativeemu.storage.EmulatorSettings
 import com.gba.nativeemu.storage.SaveRepository
 import com.gba.nativeemu.storage.SettingsManager
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.roundToInt
@@ -48,7 +53,19 @@ fun GameScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    var currentKeyMask by remember { mutableStateOf(0) }
+    // Thread-safe / volatile holders for GLRenderer thread
+    val fastForwardSpeedRef = remember { AtomicReference(settings.fastForwardSpeed) }
+    val isFastForwardRef = remember { AtomicBoolean(false) }
+    val currentKeyMaskRef = remember { AtomicInteger(0) }
+
+    // Keep fastForwardSpeedRef synced when settings change
+    LaunchedEffect(settings.fastForwardSpeed) {
+        fastForwardSpeedRef.set(settings.fastForwardSpeed)
+        if (isFastForwardRef.get()) {
+            GbaBridge.nativeSetFastForward(settings.fastForwardSpeed)
+        }
+    }
+
     var isFastForward by remember { mutableStateOf(false) }
     var fpsText by remember { mutableStateOf("60 FPS • Mát máy") }
 
@@ -97,35 +114,38 @@ fun GameScreen(
                     lastNanoTime = now
 
                     // Prevent spiral of death if app was backgrounded/stalled
-                    if (deltaNs > 100_000_000L) {
-                        deltaNs = 100_000_000L
+                    if (deltaNs > 150_000_000L) {
+                        deltaNs = 150_000_000L
                     }
 
-                    val ff = isFastForward
-                    val speed = if (ff) settings.fastForwardSpeed else 1.0f
+                    val ff = isFastForwardRef.get()
+                    val speed = if (ff) fastForwardSpeedRef.get() else 1.0f
                     accumulatorNs += (deltaNs * speed).toLong()
 
                     var rendered = false
                     var steps = 0
-                    val maxSteps = if (ff) 8 else 3
+                    // Scale steps to fast-forward multiplier (e.g. up to 24-30 steps for 8x)
+                    val maxSteps = if (ff) (speed * 3f).toInt().coerceIn(8, 32) else 4
+                    val keyMask = currentKeyMaskRef.get()
 
                     while (accumulatorNs >= GBA_FRAME_TIME_NS && steps < maxSteps) {
                         accumulatorNs -= GBA_FRAME_TIME_NS
                         steps++
                         if (accumulatorNs < GBA_FRAME_TIME_NS || steps == maxSteps) {
                             // Last step: render video and feed audio
-                            GbaBridge.nativeRenderFrame(currentKeyMask)
+                            GbaBridge.nativeRenderFrame(keyMask)
                             rendered = true
                             gbaFramesCount++
                         } else {
                             // Intermediate step (during fast forward): advance emulation without updating GL texture
-                            GbaBridge.nativeStepFrame(currentKeyMask)
+                            GbaBridge.nativeStepFrame(keyMask)
                             gbaFramesCount++
                         }
                     }
 
-                    // Reset accumulator if it got way too far ahead
-                    if (accumulatorNs > GBA_FRAME_TIME_NS * 2) {
+                    // Reset accumulator only if it got way too far ahead (scaled to fast-forward speed)
+                    val maxLagNs = if (ff) (GBA_FRAME_TIME_NS * speed * 2.5).toLong().coerceAtLeast(250_000_000L) else (GBA_FRAME_TIME_NS * 3)
+                    if (accumulatorNs > maxLagNs) {
                         accumulatorNs = 0L
                     }
 
@@ -185,6 +205,7 @@ fun GameScreen(
             isFastForward = isFastForward,
             isLandscape = isLandscape,
             layoutState = layoutState,
+            movementMode = settings.movementMode,
             isEditingLayout = isEditingLayout,
             isFullScreen = settings.aspectMode == GbaBridge.ASPECT_STRETCH || settings.aspectMode == GbaBridge.ASPECT_FULL,
             hideGamepad = settings.hideGamepad,
@@ -212,7 +233,7 @@ fun GameScreen(
             },
             onMenuClick = { showSettingsDialog = true },
             onKeyMaskChanged = { mask ->
-                currentKeyMask = mask
+                currentKeyMaskRef.set(mask)
             }
         )
 
@@ -257,16 +278,21 @@ fun GameScreen(
                 settings = settings,
                 isFastForward = isFastForward,
                 onToggleFastForward = {
-                    isFastForward = !isFastForward
-                    GbaBridge.nativeSetFastForward(if (isFastForward) settings.fastForwardSpeed else 1.0f)
-                    val status = if (isFastForward) "Tua nhanh ${settings.fastForwardSpeed.toInt()}x" else "Tốc độ chuẩn 1.0x"
+                    val nextFf = !isFastForward
+                    isFastForward = nextFf
+                    isFastForwardRef.set(nextFf)
+                    val currentSpeed = fastForwardSpeedRef.get()
+                    GbaBridge.nativeSetFastForward(if (nextFf) currentSpeed else 1.0f)
+                    val status = if (nextFf) "⚡ Tua nhanh ${currentSpeed.toInt()}x" else "⏳ Tốc độ chuẩn 1.0x"
                     Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
                 },
                 onSettingsChanged = { newSettings ->
+                    fastForwardSpeedRef.set(newSettings.fastForwardSpeed)
                     onSettingsChanged(newSettings)
                     GbaBridge.nativeSetAspectRatio(newSettings.aspectMode)
                     GbaBridge.nativeSetAudioVolume(newSettings.volume)
                     GbaBridge.nativeSetAudioMute(newSettings.isMuted)
+                    GbaBridge.nativeSetFastForward(if (isFastForwardRef.get()) newSettings.fastForwardSpeed else 1.0f)
                 },
                 onOpenSaveStates = {
                     showSettingsDialog = false
@@ -396,22 +422,33 @@ fun LayoutEditorOverlay(
 
                 // Row 2: Element Selector Chips
                 val elements = listOf(
-                    "dpad" to "D-Pad",
-                    "actions" to "Nút A/B",
+                    "dpad" to "D-Pad / Joy",
+                    "btn_a" to "Nút A",
+                    "btn_b" to "Nút B",
+                    "btn_ta" to "Nút TA",
+                    "btn_tb" to "Nút TB",
                     "shoulder_l" to "Nút L",
                     "shoulder_r" to "Nút R",
                     "select_start" to "Select/Start"
                 )
+                val chipScrollState = rememberScrollState()
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(chipScrollState),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     elements.forEach { (id, label) ->
                         FilterChip(
                             selected = selectedElementId == id,
                             onClick = { onSelectElement(id) },
-                            label = { Text(label, fontSize = 10.sp) },
-                            modifier = Modifier.weight(1f),
+                            label = {
+                                Text(
+                                    label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selectedElementId == id) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Color(0xFF00B0FF),
                                 selectedLabelColor = Color.Black

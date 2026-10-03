@@ -12,7 +12,10 @@ data class ElementLayout(
 
 data class CustomLayoutState(
     val dpad: ElementLayout = ElementLayout(),
-    val actionCluster: ElementLayout = ElementLayout(),
+    val buttonA: ElementLayout = ElementLayout(),
+    val buttonB: ElementLayout = ElementLayout(),
+    val buttonTA: ElementLayout = ElementLayout(),
+    val buttonTB: ElementLayout = ElementLayout(),
     val shoulderL: ElementLayout = ElementLayout(),
     val shoulderR: ElementLayout = ElementLayout(),
     val selectStart: ElementLayout = ElementLayout()
@@ -20,7 +23,10 @@ data class CustomLayoutState(
     fun updateElement(id: String, transform: (ElementLayout) -> ElementLayout): CustomLayoutState {
         return when (id) {
             "dpad" -> copy(dpad = transform(dpad))
-            "actions" -> copy(actionCluster = transform(actionCluster))
+            "btn_a" -> copy(buttonA = transform(buttonA))
+            "btn_b" -> copy(buttonB = transform(buttonB))
+            "btn_ta" -> copy(buttonTA = transform(buttonTA))
+            "btn_tb" -> copy(buttonTB = transform(buttonTB))
             "shoulder_l" -> copy(shoulderL = transform(shoulderL))
             "shoulder_r" -> copy(shoulderR = transform(shoulderR))
             "select_start" -> copy(selectStart = transform(selectStart))
@@ -31,7 +37,10 @@ data class CustomLayoutState(
     fun getElement(id: String): ElementLayout {
         return when (id) {
             "dpad" -> dpad
-            "actions" -> actionCluster
+            "btn_a" -> buttonA
+            "btn_b" -> buttonB
+            "btn_ta" -> buttonTA
+            "btn_tb" -> buttonTB
             "shoulder_l" -> shoulderL
             "shoulder_r" -> shoulderR
             "select_start" -> selectStart
@@ -47,12 +56,17 @@ data class EmulatorSettings(
     val isMuted: Boolean = false,
     val gamepadOpacity: Float = 0.85f,
     val orientationMode: Int = ORIENTATION_AUTO,
-    val hideGamepad: Boolean = false
+    val hideGamepad: Boolean = false,
+    val movementMode: Int = MOVEMENT_DPAD
 ) {
     companion object {
         const val ORIENTATION_AUTO = 0
         const val ORIENTATION_PORTRAIT = 1
         const val ORIENTATION_LANDSCAPE = 2
+
+        const val MOVEMENT_DPAD = 0
+        const val MOVEMENT_JOYSTICK_FIXED = 1
+        const val MOVEMENT_JOYSTICK_FLOATING = 2
     }
 }
 
@@ -67,6 +81,7 @@ class SettingsManager(context: Context) {
         private const val KEY_OPACITY = "setting_gamepad_opacity"
         private const val KEY_ORIENTATION = "setting_orientation_mode"
         private const val KEY_HIDE_GAMEPAD = "setting_hide_gamepad"
+        private const val KEY_MOVEMENT_MODE = "setting_movement_mode"
     }
 
     fun loadSettings(): EmulatorSettings {
@@ -77,7 +92,8 @@ class SettingsManager(context: Context) {
             isMuted = prefs.getBoolean(KEY_MUTED, false),
             gamepadOpacity = prefs.getFloat(KEY_OPACITY, 0.85f),
             orientationMode = prefs.getInt(KEY_ORIENTATION, EmulatorSettings.ORIENTATION_AUTO),
-            hideGamepad = prefs.getBoolean(KEY_HIDE_GAMEPAD, false)
+            hideGamepad = prefs.getBoolean(KEY_HIDE_GAMEPAD, false),
+            movementMode = prefs.getInt(KEY_MOVEMENT_MODE, EmulatorSettings.MOVEMENT_DPAD)
         )
     }
 
@@ -90,6 +106,7 @@ class SettingsManager(context: Context) {
             .putFloat(KEY_OPACITY, settings.gamepadOpacity)
             .putInt(KEY_ORIENTATION, settings.orientationMode)
             .putBoolean(KEY_HIDE_GAMEPAD, settings.hideGamepad)
+            .putInt(KEY_MOVEMENT_MODE, settings.movementMode)
             .apply()
     }
 
@@ -97,7 +114,10 @@ class SettingsManager(context: Context) {
         val suffix = if (isLandscape) "_landscape" else "_portrait"
         return CustomLayoutState(
             dpad = loadElement("dpad$suffix"),
-            actionCluster = loadElement("actions$suffix"),
+            buttonA = loadElement("btn_a$suffix"),
+            buttonB = loadElement("btn_b$suffix"),
+            buttonTA = loadElement("btn_ta$suffix"),
+            buttonTB = loadElement("btn_tb$suffix"),
             shoulderL = loadElement("shoulder_l$suffix"),
             shoulderR = loadElement("shoulder_r$suffix"),
             selectStart = loadElement("select_start$suffix")
@@ -108,7 +128,10 @@ class SettingsManager(context: Context) {
         val suffix = if (isLandscape) "_landscape" else "_portrait"
         val editor = prefs.edit()
         saveElement(editor, "dpad$suffix", layout.dpad)
-        saveElement(editor, "actions$suffix", layout.actionCluster)
+        saveElement(editor, "btn_a$suffix", layout.buttonA)
+        saveElement(editor, "btn_b$suffix", layout.buttonB)
+        saveElement(editor, "btn_ta$suffix", layout.buttonTA)
+        saveElement(editor, "btn_tb$suffix", layout.buttonTB)
         saveElement(editor, "shoulder_l$suffix", layout.shoulderL)
         saveElement(editor, "shoulder_r$suffix", layout.shoulderR)
         saveElement(editor, "select_start$suffix", layout.selectStart)

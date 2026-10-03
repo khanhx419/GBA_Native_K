@@ -37,6 +37,7 @@ fun SettingsDialog(
     var opacity by remember { mutableStateOf(settings.gamepadOpacity) }
     var orientation by remember { mutableStateOf(settings.orientationMode) }
     var hideControls by remember { mutableStateOf(settings.hideGamepad) }
+    var movement by remember { mutableStateOf(settings.movementMode) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -94,7 +95,29 @@ fun SettingsDialog(
                     Text("🎮 Chỉnh vị trí & kích thước phím", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
 
-                HorizontalDivider(color = Color(0x33FFFFFF))
+                // --- KIỂU DI CHUYỂN (D-PAD / JOYSTICK CỐ ĐỊNH / JOYSTICK ĐỘNG) ---
+                Text("Kiểu phím di chuyển", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val movementModes = listOf(
+                        "🎛️ D-Pad" to EmulatorSettings.MOVEMENT_DPAD,
+                        "🕹️ Joy Cố định" to EmulatorSettings.MOVEMENT_JOYSTICK_FIXED,
+                        "✨ Joy Động" to EmulatorSettings.MOVEMENT_JOYSTICK_FLOATING
+                    )
+                    movementModes.forEach { (name, value) ->
+                        FilterChip(
+                            selected = movement == value,
+                            onClick = {
+                                movement = value
+                                onSettingsChanged(settings.copy(movementMode = value))
+                            },
+                            label = { Text(name, fontSize = 10.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
 
                 // --- HƯỚNG MÀN HÌNH (XOAY TỰ DO / KHÓA DỌC / KHÓA NGANG) ---
                 Text("Hướng màn hình", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))

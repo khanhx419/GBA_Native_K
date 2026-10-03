@@ -31,12 +31,17 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
 import com.gba.nativeemu.storage.CustomLayoutState
 import com.gba.nativeemu.storage.ElementLayout
+import com.gba.nativeemu.storage.EmulatorSettings
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 @Composable
@@ -49,6 +54,7 @@ fun VirtualGamepad(
     layoutState: CustomLayoutState = CustomLayoutState(),
     isEditingLayout: Boolean = false,
     selectedElementId: String = "dpad",
+    movementMode: Int = EmulatorSettings.MOVEMENT_DPAD,
     isFullScreen: Boolean = false,
     hideGamepad: Boolean = false,
     onToggleFullScreen: () -> Unit = {},
@@ -60,9 +66,40 @@ fun VirtualGamepad(
     var dpadMask by remember { mutableStateOf(0) }
     var actionMask by remember { mutableStateOf(0) }
 
-    LaunchedEffect(dpadMask, actionMask) {
+    // Turbo button states
+    var isTurboAPressed by remember { mutableStateOf(false) }
+    var isTurboBPressed by remember { mutableStateOf(false) }
+    var turboMask by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isTurboAPressed) {
+        if (isTurboAPressed && !isEditingLayout) {
+            while (isTurboAPressed) {
+                turboMask = turboMask or GbaBridge.KEY_A
+                kotlinx.coroutines.delay(40)
+                turboMask = turboMask and GbaBridge.KEY_A.inv()
+                kotlinx.coroutines.delay(40)
+            }
+        } else {
+            turboMask = turboMask and GbaBridge.KEY_A.inv()
+        }
+    }
+
+    LaunchedEffect(isTurboBPressed) {
+        if (isTurboBPressed && !isEditingLayout) {
+            while (isTurboBPressed) {
+                turboMask = turboMask or GbaBridge.KEY_B
+                kotlinx.coroutines.delay(40)
+                turboMask = turboMask and GbaBridge.KEY_B.inv()
+                kotlinx.coroutines.delay(40)
+            }
+        } else {
+            turboMask = turboMask and GbaBridge.KEY_B.inv()
+        }
+    }
+
+    LaunchedEffect(dpadMask, actionMask, turboMask) {
         if (!isEditingLayout) {
-            onKeyMaskChanged(dpadMask or actionMask)
+            onKeyMaskChanged(dpadMask or actionMask or turboMask)
         }
     }
 
@@ -74,7 +111,7 @@ fun VirtualGamepad(
     ) {
         if (!isLandscape) {
             // ==================== PORTRAIT MODE ====================
-            // 1. Top Toolbar (FPS on left, Select & Start & Menu on right)
+            // 1. Top Toolbar (FPS on left, Select & Start & Fullscreen & Menu on right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -104,7 +141,7 @@ fun VirtualGamepad(
                     )
                 }
 
-                // Right: SELECT, START, and Hamburger Menu (☰)
+                // Right: SELECT, START, Fullscreen, and Hamburger Menu (☰)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -177,312 +214,474 @@ fun VirtualGamepad(
 
             if (!hideGamepad || isEditingLayout) {
                 // 2. Shoulder Buttons (L & R - Positioned above DPad / Action buttons)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 14.dp, end = 14.dp, bottom = 175.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // L Button
+                    GamepadButton(
+                        text = "L",
+                        modifier = Modifier
+                            .width(72.dp)
+                            .height(36.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.shoulderL,
+                                elementId = "shoulder_l",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "shoulder_l",
+                                shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp),
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp),
+                        color = Color(0xFF2C2C3E),
+                        fontSize = 15.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_L else actionMask and GbaBridge.KEY_L.inv()
+                        }
+                    )
+
+                    // R Button
+                    GamepadButton(
+                        text = "R",
+                        modifier = Modifier
+                            .width(72.dp)
+                            .height(36.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.shoulderR,
+                                elementId = "shoulder_r",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "shoulder_r",
+                                shape = RoundedCornerShape(topEnd = 14.dp, bottomStart = 14.dp),
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = RoundedCornerShape(topEnd = 14.dp, bottomStart = 14.dp),
+                        color = Color(0xFF2C2C3E),
+                        fontSize = 15.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_R else actionMask and GbaBridge.KEY_R.inv()
+                        }
+                    )
+                }
+
+                // 3. Movement Control (Bottom-Left: D-Pad / Fixed Joystick / Floating Joystick)
+                VirtualMovementControl(
+                    modifier = Modifier
+                        .size(if (movementMode == EmulatorSettings.MOVEMENT_JOYSTICK_FLOATING) 180.dp else 140.dp)
+                        .align(Alignment.BottomStart)
+                        .padding(start = 12.dp, bottom = 8.dp)
+                        .layoutElementModifier(
+                            layout = layoutState.dpad,
+                            elementId = "dpad",
+                            isEditing = isEditingLayout,
+                            isSelected = selectedElementId == "dpad",
+                            shape = if (movementMode == EmulatorSettings.MOVEMENT_JOYSTICK_FLOATING) RoundedCornerShape(16.dp) else CircleShape,
+                            onSelect = onSelectElement,
+                            onMove = onMoveElement
+                        ),
+                    movementMode = movementMode,
+                    isEditing = isEditingLayout,
+                    onDirectionChanged = { mask -> dpadMask = mask }
+                )
+
+                // 4. Action Buttons (Individually Draggable: B, A, TB, TA - With Wide Ergonomic Spacing)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .fillMaxSize()
+                ) {
+                    // Button B (Left / Lower)
+                    GamepadButton(
+                        text = "B",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 84.dp, bottom = 22.dp)
+                            .size(54.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonB,
+                                elementId = "btn_b",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_b",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFFB71C1C),
+                        fontSize = 21.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_B else actionMask and GbaBridge.KEY_B.inv()
+                        }
+                    )
+
+                    // Button A (Right / Higher - Comfortable spacing from B)
+                    GamepadButton(
+                        text = "A",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 48.dp)
+                            .size(54.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonA,
+                                elementId = "btn_a",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_a",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFF1B5E20),
+                        fontSize = 21.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_A else actionMask and GbaBridge.KEY_A.inv()
+                        }
+                    )
+
+                    // Turbo B Button (Above B)
+                    GamepadButton(
+                        text = "TB",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 84.dp, bottom = 86.dp)
+                            .size(42.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonTB,
+                                elementId = "btn_tb",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_tb",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFFE65100),
+                        fontSize = 13.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            isTurboBPressed = pressed
+                        }
+                    )
+
+                    // Turbo A Button (Above A)
+                    GamepadButton(
+                        text = "TA",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 112.dp)
+                            .size(42.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonTA,
+                                elementId = "btn_ta",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_ta",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFF00838F),
+                        fontSize = 13.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            isTurboAPressed = pressed
+                        }
+                    )
+                }
+            }
+        } else {
+            // ==================== LANDSCAPE MODE ====================
+            // 1. Top Toolbar (FPS on left, Select & Start in middle, Fullscreen & Menu on right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .padding(start = 14.dp, end = 14.dp, bottom = 175.dp),
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // L Button
+                // Left: FPS & Thermal Status Badge
+                Row(
+                    modifier = Modifier
+                        .background(Color(0xCC14141E), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(if (isFastForward) Color(0xFFFF9100) else Color(0xFF00E676), CircleShape)
+                    )
+                    Text(
+                        text = fpsText,
+                        color = if (isFastForward) Color(0xFFFFB74D) else Color(0xFF00E676),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Center: SELECT & START (Draggable & Editable)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.layoutElementModifier(
+                        layout = layoutState.selectStart,
+                        elementId = "select_start",
+                        isEditing = isEditingLayout,
+                        isSelected = selectedElementId == "select_start",
+                        shape = RoundedCornerShape(14.dp),
+                        onSelect = onSelectElement,
+                        onMove = onMoveElement
+                    )
+                ) {
+                    PillButton(
+                        text = "SELECT",
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_SELECT else actionMask and GbaBridge.KEY_SELECT.inv()
+                        }
+                    )
+
+                    PillButton(
+                        text = "START",
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_START else actionMask and GbaBridge.KEY_START.inv()
+                        }
+                    )
+                }
+
+                // Right: Fullscreen Toggle and Hamburger Menu Button (☰)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Full Screen Toggle Button (⛶)
+                    IconButton(
+                        onClick = onToggleFullScreen,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(
+                                if (isFullScreen) Color(0xCC00838F) else Color(0x992C2C3E),
+                                RoundedCornerShape(8.dp)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            contentDescription = if (isFullScreen) "Thu nhỏ 3:2" else "Toàn màn hình",
+                            tint = if (isFullScreen) Color(0xFF00E5FF) else Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onMenuClick,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(Color(0x992C2C3E), RoundedCornerShape(8.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            if (!hideGamepad || isEditingLayout) {
+                // 2. Shoulder L Button (Top-Left in Landscape)
                 GamepadButton(
                     text = "L",
                     modifier = Modifier
-                        .width(72.dp)
-                        .height(36.dp)
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 46.dp)
+                        .width(76.dp)
+                        .height(40.dp)
                         .layoutElementModifier(
                             layout = layoutState.shoulderL,
                             elementId = "shoulder_l",
                             isEditing = isEditingLayout,
                             isSelected = selectedElementId == "shoulder_l",
-                            shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             onSelect = onSelectElement,
                             onMove = onMoveElement
                         ),
-                    shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF2C2C3E),
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     isEditing = isEditingLayout,
                     onPressState = { pressed ->
                         actionMask = if (pressed) actionMask or GbaBridge.KEY_L else actionMask and GbaBridge.KEY_L.inv()
                     }
                 )
 
-                // R Button
+                // 3. Shoulder R Button (Top-Right in Landscape)
                 GamepadButton(
                     text = "R",
                     modifier = Modifier
-                        .width(72.dp)
-                        .height(36.dp)
+                        .align(Alignment.TopEnd)
+                        .padding(end = 16.dp, top = 46.dp)
+                        .width(76.dp)
+                        .height(40.dp)
                         .layoutElementModifier(
                             layout = layoutState.shoulderR,
                             elementId = "shoulder_r",
                             isEditing = isEditingLayout,
                             isSelected = selectedElementId == "shoulder_r",
-                            shape = RoundedCornerShape(topEnd = 14.dp, bottomStart = 14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             onSelect = onSelectElement,
                             onMove = onMoveElement
                         ),
-                    shape = RoundedCornerShape(topEnd = 14.dp, bottomStart = 14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF2C2C3E),
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     isEditing = isEditingLayout,
                     onPressState = { pressed ->
                         actionMask = if (pressed) actionMask or GbaBridge.KEY_R else actionMask and GbaBridge.KEY_R.inv()
                     }
                 )
-            }
 
-            // 3. Lower Controls (D-Pad & Action Cluster)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
-            ) {
-                // Left: Circular Precision D-Pad
-                CircularDPad(
+                // 4. Movement Control (Bottom-Left in Landscape)
+                VirtualMovementControl(
                     modifier = Modifier
-                        .size(140.dp)
+                        .size(if (movementMode == EmulatorSettings.MOVEMENT_JOYSTICK_FLOATING) 200.dp else 145.dp)
                         .align(Alignment.BottomStart)
-                        .padding(start = 12.dp, bottom = 6.dp)
+                        .padding(start = 16.dp, bottom = 16.dp)
                         .layoutElementModifier(
                             layout = layoutState.dpad,
                             elementId = "dpad",
                             isEditing = isEditingLayout,
                             isSelected = selectedElementId == "dpad",
-                            shape = CircleShape,
+                            shape = if (movementMode == EmulatorSettings.MOVEMENT_JOYSTICK_FLOATING) RoundedCornerShape(16.dp) else CircleShape,
                             onSelect = onSelectElement,
                             onMove = onMoveElement
                         ),
+                    movementMode = movementMode,
                     isEditing = isEditingLayout,
-                    onDirectionChanged = { mask ->
-                        dpadMask = mask
-                    }
+                    onDirectionChanged = { mask -> dpadMask = mask }
                 )
 
-                // Right: Action Buttons Cluster (B, A, Turbo B, Turbo A, Combo A+B)
-                ActionButtonsCluster(
-                    modifier = Modifier
-                        .size(width = 140.dp, height = 155.dp)
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 12.dp, bottom = 6.dp)
-                        .layoutElementModifier(
-                            layout = layoutState.actionCluster,
-                            elementId = "actions",
-                            isEditing = isEditingLayout,
-                            isSelected = selectedElementId == "actions",
-                            shape = RoundedCornerShape(20.dp),
-                            onSelect = onSelectElement,
-                            onMove = onMoveElement
-                        ),
-                    isEditing = isEditingLayout,
-                    onMaskChanged = { mask ->
-                        actionMask = (actionMask and (GbaBridge.KEY_L or GbaBridge.KEY_R or GbaBridge.KEY_START or GbaBridge.KEY_SELECT)) or mask
-                    }
-                )
-            }
-        }
-    } else {
-        // ==================== LANDSCAPE MODE ====================
-        // 1. Top Toolbar (FPS on left, Select & Start in middle, Menu on right)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(horizontal = 20.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left: FPS & Thermal Status Badge
-            Row(
-                modifier = Modifier
-                    .background(Color(0xCC14141E), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
+                // 5. Action Buttons (Bottom-Right in Landscape - Individually Draggable: B, A, TB, TA)
                 Box(
                     modifier = Modifier
-                        .size(7.dp)
-                        .background(if (isFastForward) Color(0xFFFF9100) else Color(0xFF00E676), CircleShape)
-                )
-                Text(
-                    text = fpsText,
-                    color = if (isFastForward) Color(0xFFFFB74D) else Color(0xFF00E676),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Center: SELECT & START (Draggable & Editable)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.layoutElementModifier(
-                    layout = layoutState.selectStart,
-                    elementId = "select_start",
-                    isEditing = isEditingLayout,
-                    isSelected = selectedElementId == "select_start",
-                    shape = RoundedCornerShape(14.dp),
-                    onSelect = onSelectElement,
-                    onMove = onMoveElement
-                )
-            ) {
-                PillButton(
-                    text = "SELECT",
-                    isEditing = isEditingLayout,
-                    onPressState = { pressed ->
-                        actionMask = if (pressed) actionMask or GbaBridge.KEY_SELECT else actionMask and GbaBridge.KEY_SELECT.inv()
-                    }
-                )
-
-                PillButton(
-                    text = "START",
-                    isEditing = isEditingLayout,
-                    onPressState = { pressed ->
-                        actionMask = if (pressed) actionMask or GbaBridge.KEY_START else actionMask and GbaBridge.KEY_START.inv()
-                    }
-                )
-            }
-
-            // Right: Fullscreen Toggle and Hamburger Menu Button (☰)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Full Screen Toggle Button (⛶)
-                IconButton(
-                    onClick = onToggleFullScreen,
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(
-                            if (isFullScreen) Color(0xCC00838F) else Color(0x992C2C3E),
-                            RoundedCornerShape(8.dp)
-                        )
+                        .align(Alignment.BottomEnd)
+                        .fillMaxSize()
                 ) {
-                    Icon(
-                        imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                        contentDescription = if (isFullScreen) "Thu nhỏ 3:2" else "Toàn màn hình",
-                        tint = if (isFullScreen) Color(0xFF00E5FF) else Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onMenuClick,
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(Color(0x992C2C3E), RoundedCornerShape(8.dp))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Menu",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        if (!hideGamepad || isEditingLayout) {
-            // 2. Shoulder L Button (Top-Left in Landscape)
-            GamepadButton(
-                text = "L",
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 46.dp)
-                    .width(76.dp)
-                    .height(40.dp)
-                    .layoutElementModifier(
-                        layout = layoutState.shoulderL,
-                        elementId = "shoulder_l",
-                        isEditing = isEditingLayout,
-                        isSelected = selectedElementId == "shoulder_l",
-                        shape = RoundedCornerShape(12.dp),
-                        onSelect = onSelectElement,
-                        onMove = onMoveElement
-                    ),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF2C2C3E),
-                fontSize = 16.sp,
-                isEditing = isEditingLayout,
-                onPressState = { pressed ->
-                    actionMask = if (pressed) actionMask or GbaBridge.KEY_L else actionMask and GbaBridge.KEY_L.inv()
-                }
-            )
-
-            // 3. Shoulder R Button (Top-Right in Landscape)
-            GamepadButton(
-                text = "R",
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = 46.dp)
-                    .width(76.dp)
-                    .height(40.dp)
-                    .layoutElementModifier(
-                        layout = layoutState.shoulderR,
-                        elementId = "shoulder_r",
-                        isEditing = isEditingLayout,
-                        isSelected = selectedElementId == "shoulder_r",
-                        shape = RoundedCornerShape(12.dp),
-                        onSelect = onSelectElement,
-                        onMove = onMoveElement
-                    ),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF2C2C3E),
-                fontSize = 16.sp,
-                isEditing = isEditingLayout,
-                onPressState = { pressed ->
-                    actionMask = if (pressed) actionMask or GbaBridge.KEY_R else actionMask and GbaBridge.KEY_R.inv()
-                }
-            )
-
-            // 4. D-Pad (Bottom-Left in Landscape)
-            CircularDPad(
-                modifier = Modifier
-                    .size(145.dp)
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 16.dp)
-                    .layoutElementModifier(
-                        layout = layoutState.dpad,
-                        elementId = "dpad",
-                        isEditing = isEditingLayout,
-                        isSelected = selectedElementId == "dpad",
+                    // Button B (Left / Lower)
+                    GamepadButton(
+                        text = "B",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 96.dp, bottom = 24.dp)
+                            .size(58.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonB,
+                                elementId = "btn_b",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_b",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
                         shape = CircleShape,
-                        onSelect = onSelectElement,
-                        onMove = onMoveElement
-                    ),
-                isEditing = isEditingLayout,
-                onDirectionChanged = { mask ->
-                    dpadMask = mask
-                }
-            )
-
-            // 5. Action Buttons Cluster (Bottom-Right in Landscape)
-            ActionButtonsCluster(
-                modifier = Modifier
-                    .size(width = 145.dp, height = 155.dp)
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 16.dp)
-                    .layoutElementModifier(
-                        layout = layoutState.actionCluster,
-                        elementId = "actions",
+                        color = Color(0xFFB71C1C),
+                        fontSize = 22.sp,
                         isEditing = isEditingLayout,
-                        isSelected = selectedElementId == "actions",
-                        shape = RoundedCornerShape(20.dp),
-                        onSelect = onSelectElement,
-                        onMove = onMoveElement
-                    ),
-                isEditing = isEditingLayout,
-                onMaskChanged = { mask ->
-                    actionMask = (actionMask and (GbaBridge.KEY_L or GbaBridge.KEY_R or GbaBridge.KEY_START or GbaBridge.KEY_SELECT)) or mask
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_B else actionMask and GbaBridge.KEY_B.inv()
+                        }
+                    )
+
+                    // Button A (Right / Higher)
+                    GamepadButton(
+                        text = "A",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 54.dp)
+                            .size(58.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonA,
+                                elementId = "btn_a",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_a",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFF1B5E20),
+                        fontSize = 22.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            actionMask = if (pressed) actionMask or GbaBridge.KEY_A else actionMask and GbaBridge.KEY_A.inv()
+                        }
+                    )
+
+                    // Turbo B Button
+                    GamepadButton(
+                        text = "TB",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 96.dp, bottom = 92.dp)
+                            .size(44.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonTB,
+                                elementId = "btn_tb",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_tb",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFFE65100),
+                        fontSize = 14.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            isTurboBPressed = pressed
+                        }
+                    )
+
+                    // Turbo A Button
+                    GamepadButton(
+                        text = "TA",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 122.dp)
+                            .size(44.dp)
+                            .layoutElementModifier(
+                                layout = layoutState.buttonTA,
+                                elementId = "btn_ta",
+                                isEditing = isEditingLayout,
+                                isSelected = selectedElementId == "btn_ta",
+                                shape = CircleShape,
+                                onSelect = onSelectElement,
+                                onMove = onMoveElement
+                            ),
+                        shape = CircleShape,
+                        color = Color(0xFF00838F),
+                        fontSize = 14.sp,
+                        isEditing = isEditingLayout,
+                        onPressState = { pressed ->
+                            isTurboAPressed = pressed
+                        }
+                    )
                 }
-            )
+            }
         }
     }
-}
 }
 
 @Composable
@@ -534,6 +733,244 @@ fun Modifier.layoutElementModifier(
             ) {
                 onSelect(elementId)
             }
+    }
+}
+
+@Composable
+fun VirtualMovementControl(
+    modifier: Modifier = Modifier,
+    movementMode: Int,
+    isEditing: Boolean = false,
+    onDirectionChanged: (Int) -> Unit
+) {
+    when (movementMode) {
+        EmulatorSettings.MOVEMENT_JOYSTICK_FIXED -> {
+            FixedJoystick(
+                modifier = modifier,
+                isEditing = isEditing,
+                onDirectionChanged = onDirectionChanged
+            )
+        }
+        EmulatorSettings.MOVEMENT_JOYSTICK_FLOATING -> {
+            FloatingJoystick(
+                modifier = modifier,
+                isEditing = isEditing,
+                onDirectionChanged = onDirectionChanged
+            )
+        }
+        else -> {
+            CircularDPad(
+                modifier = modifier,
+                isEditing = isEditing,
+                onDirectionChanged = onDirectionChanged
+            )
+        }
+    }
+}
+
+@Composable
+fun FixedJoystick(
+    modifier: Modifier = Modifier,
+    isEditing: Boolean = false,
+    onDirectionChanged: (Int) -> Unit
+) {
+    var knobOffset by remember { mutableStateOf(Offset.Zero) }
+
+    val pointerMod = if (isEditing) {
+        Modifier
+    } else {
+        Modifier.pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val maxRadius = size.width * 0.38f
+
+                val updateKnob = { pos: Offset ->
+                    val dx = pos.x - center.x
+                    val dy = pos.y - center.y
+                    val dist = sqrt(dx * dx + dy * dy)
+                    val clampedDist = dist.coerceAtMost(maxRadius)
+                    val angle = atan2(dy.toDouble(), dx.toDouble())
+                    val clampedDx = (cos(angle) * clampedDist).toFloat()
+                    val clampedDy = (sin(angle) * clampedDist).toFloat()
+                    knobOffset = Offset(clampedDx, clampedDy)
+                    updateDirectionFromDelta(dx, dy, maxRadius, onDirectionChanged)
+                }
+
+                updateKnob(down.position)
+
+                do {
+                    val event = awaitPointerEvent()
+                    val pointer = event.changes.find { it.id == down.id }
+                    if (pointer != null && pointer.pressed) {
+                        updateKnob(pointer.position)
+                    } else {
+                        knobOffset = Offset.Zero
+                        onDirectionChanged(0)
+                        break
+                    }
+                } while (event.changes.any { it.pressed })
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier.then(pointerMod),
+        contentAlignment = Alignment.Center
+    ) {
+        // Base Circle
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val radius = size.width / 2f
+
+            drawCircle(color = Color(0xAA1E1E28), radius = radius, center = center)
+            drawCircle(color = Color(0xFF00E5FF).copy(alpha = 0.5f), radius = radius, center = center, style = Stroke(width = 2.5.dp.toPx()))
+            drawCircle(color = Color(0x44FFFFFF), radius = radius * 0.55f, center = center, style = Stroke(width = 1.5.dp.toPx()))
+
+            val crossLen = radius * 0.2f
+            drawLine(Color(0x8800E5FF), Offset(center.x, center.y - radius + 4.dp.toPx()), Offset(center.x, center.y - radius + 4.dp.toPx() + crossLen), strokeWidth = 2.dp.toPx())
+            drawLine(Color(0x8800E5FF), Offset(center.x, center.y + radius - 4.dp.toPx()), Offset(center.x, center.y + radius - 4.dp.toPx() - crossLen), strokeWidth = 2.dp.toPx())
+            drawLine(Color(0x8800E5FF), Offset(center.x - radius + 4.dp.toPx(), center.y), Offset(center.x - radius + 4.dp.toPx() + crossLen, center.y), strokeWidth = 2.dp.toPx())
+            drawLine(Color(0x8800E5FF), Offset(center.x + radius - 4.dp.toPx(), center.y), Offset(center.x + radius - 4.dp.toPx() - crossLen, center.y), strokeWidth = 2.dp.toPx())
+        }
+
+        // Thumbstick Knob
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(knobOffset.x.roundToInt(), knobOffset.y.roundToInt()) }
+                .size(52.dp)
+                .background(
+                    if (knobOffset != Offset.Zero) Color(0xFF00E5FF) else Color(0xFF2C2C3E),
+                    CircleShape
+                )
+                .border(2.dp, Color(0xFF80D8FF), CircleShape)
+        )
+    }
+}
+
+@Composable
+fun FloatingJoystick(
+    modifier: Modifier = Modifier,
+    isEditing: Boolean = false,
+    onDirectionChanged: (Int) -> Unit
+) {
+    var touchCenter by remember { mutableStateOf<Offset?>(null) }
+    var knobOffset by remember { mutableStateOf(Offset.Zero) }
+
+    val pointerMod = if (isEditing) {
+        Modifier
+    } else {
+        Modifier.pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                touchCenter = down.position
+                knobOffset = Offset.Zero
+                val maxRadius = 55.dp.toPx()
+
+                val updateFromPos = { currentPos: Offset ->
+                    val center = touchCenter ?: down.position
+                    val dx = currentPos.x - center.x
+                    val dy = currentPos.y - center.y
+                    val dist = sqrt(dx * dx + dy * dy)
+                    val clampedDist = dist.coerceAtMost(maxRadius)
+                    val angle = atan2(dy.toDouble(), dx.toDouble())
+                    val clampedDx = (cos(angle) * clampedDist).toFloat()
+                    val clampedDy = (sin(angle) * clampedDist).toFloat()
+                    knobOffset = Offset(clampedDx, clampedDy)
+                    updateDirectionFromDelta(dx, dy, maxRadius, onDirectionChanged)
+                }
+
+                updateFromPos(down.position)
+
+                do {
+                    val event = awaitPointerEvent()
+                    val pointer = event.changes.find { it.id == down.id }
+                    if (pointer != null && pointer.pressed) {
+                        updateFromPos(pointer.position)
+                    } else {
+                        touchCenter = null
+                        knobOffset = Offset.Zero
+                        onDirectionChanged(0)
+                        break
+                    }
+                } while (event.changes.any { it.pressed })
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier.then(pointerMod)
+    ) {
+        if (isEditing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(1.dp, Color(0x6600E5FF), RoundedCornerShape(16.dp))
+                    .background(Color(0x1500E5FF), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                FixedJoystickPreview(modifier = Modifier.size(110.dp))
+            }
+        } else if (touchCenter != null) {
+            val center = touchCenter!!
+            val baseRadius = 55.dp
+            Box(
+                modifier = Modifier
+                    .offset {
+                        IntOffset(
+                            (center.x - baseRadius.toPx()).roundToInt(),
+                            (center.y - baseRadius.toPx()).roundToInt()
+                        )
+                    }
+                    .size(baseRadius * 2),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    val r = size.width / 2f
+                    drawCircle(Color(0xBB1E1E28), radius = r, center = c)
+                    drawCircle(Color(0xFF00E5FF), radius = r, center = c, style = Stroke(2.5.dp.toPx()))
+                    drawCircle(Color(0x44FFFFFF), radius = r * 0.55f, center = c, style = Stroke(1.5.dp.toPx()))
+                }
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(knobOffset.x.roundToInt(), knobOffset.y.roundToInt()) }
+                        .size(46.dp)
+                        .background(Color(0xFF00E5FF), CircleShape)
+                        .border(2.dp, Color.White, CircleShape)
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Chạm để di chuyển",
+                    color = Color(0x55FFFFFF),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FixedJoystickPreview(modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val c = Offset(size.width / 2f, size.height / 2f)
+            val r = size.width / 2f
+            drawCircle(Color(0xAA1E1E28), radius = r, center = c)
+            drawCircle(Color(0xFF00E5FF), radius = r, center = c, style = Stroke(2.dp.toPx()))
+        }
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .background(Color(0xFF00E5FF), CircleShape)
+                .border(2.dp, Color.White, CircleShape)
+        )
     }
 }
 
@@ -655,129 +1092,29 @@ private fun updateDirection(pos: Offset, viewSize: Float, onDirectionChanged: (I
     onDirectionChanged(mask)
 }
 
-@Composable
-fun ActionButtonsCluster(
-    modifier: Modifier = Modifier,
-    isEditing: Boolean = false,
-    onMaskChanged: (Int) -> Unit
-) {
-    var pressedMask by remember { mutableStateOf(0) }
-    var isTurboAPressed by remember { mutableStateOf(false) }
-    var isTurboBPressed by remember { mutableStateOf(false) }
-    var turboMask by remember { mutableStateOf(0) }
-
-    LaunchedEffect(isTurboAPressed) {
-        if (isTurboAPressed && !isEditing) {
-            while (isTurboAPressed) {
-                turboMask = turboMask or GbaBridge.KEY_A
-                kotlinx.coroutines.delay(40)
-                turboMask = turboMask and GbaBridge.KEY_A.inv()
-                kotlinx.coroutines.delay(40)
-            }
-        } else {
-            turboMask = turboMask and GbaBridge.KEY_A.inv()
-        }
+fun updateDirectionFromDelta(dx: Float, dy: Float, maxRadius: Float, onDirectionChanged: (Int) -> Unit) {
+    val dist = sqrt(dx * dx + dy * dy)
+    val deadZone = maxRadius * 0.16f
+    if (dist < deadZone) {
+        onDirectionChanged(0)
+        return
     }
 
-    LaunchedEffect(isTurboBPressed) {
-        if (isTurboBPressed && !isEditing) {
-            while (isTurboBPressed) {
-                turboMask = turboMask or GbaBridge.KEY_B
-                kotlinx.coroutines.delay(40)
-                turboMask = turboMask and GbaBridge.KEY_B.inv()
-                kotlinx.coroutines.delay(40)
-            }
-        } else {
-            turboMask = turboMask and GbaBridge.KEY_B.inv()
-        }
+    var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+    if (angle < 0) angle += 360f
+
+    var mask = 0
+    when {
+        angle in 337.5f..360f || angle in 0.0f..22.5f -> mask = GbaBridge.KEY_RIGHT
+        angle in 22.5f..67.5f -> mask = GbaBridge.KEY_RIGHT or GbaBridge.KEY_DOWN
+        angle in 67.5f..112.5f -> mask = GbaBridge.KEY_DOWN
+        angle in 112.5f..157.5f -> mask = GbaBridge.KEY_LEFT or GbaBridge.KEY_DOWN
+        angle in 157.5f..202.5f -> mask = GbaBridge.KEY_LEFT
+        angle in 202.5f..247.5f -> mask = GbaBridge.KEY_LEFT or GbaBridge.KEY_UP
+        angle in 247.5f..292.5f -> mask = GbaBridge.KEY_UP
+        angle in 292.5f..337.5f -> mask = GbaBridge.KEY_RIGHT or GbaBridge.KEY_UP
     }
-
-    LaunchedEffect(pressedMask, turboMask) {
-        if (!isEditing) {
-            onMaskChanged(pressedMask or turboMask)
-        }
-    }
-
-    Box(modifier = modifier) {
-        // Combo A+B Button (Top Center of Action Cluster)
-        GamepadButton(
-            text = "A+B",
-            modifier = Modifier
-                .size(38.dp)
-                .align(Alignment.TopCenter),
-            shape = CircleShape,
-            color = Color(0xFF4A148C),
-            fontSize = 11.sp,
-            isEditing = isEditing,
-            onPressState = { pressed ->
-                pressedMask = if (pressed) pressedMask or (GbaBridge.KEY_A or GbaBridge.KEY_B) else pressedMask and (GbaBridge.KEY_A or GbaBridge.KEY_B).inv()
-            }
-        )
-
-        // Turbo B Button (Above B)
-        GamepadButton(
-            text = "TB",
-            modifier = Modifier
-                .size(38.dp)
-                .align(Alignment.TopStart)
-                .offset(x = 8.dp, y = 46.dp),
-            shape = CircleShape,
-            color = Color(0xFFE65100),
-            fontSize = 12.sp,
-            isEditing = isEditing,
-            onPressState = { pressed ->
-                isTurboBPressed = pressed
-            }
-        )
-
-        // Turbo A Button (Above A)
-        GamepadButton(
-            text = "TA",
-            modifier = Modifier
-                .size(38.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = (-8).dp, y = 32.dp),
-            shape = CircleShape,
-            color = Color(0xFF00838F),
-            fontSize = 12.sp,
-            isEditing = isEditing,
-            onPressState = { pressed ->
-                isTurboAPressed = pressed
-            }
-        )
-
-        // B Button (Left / Lower)
-        GamepadButton(
-            text = "B",
-            modifier = Modifier
-                .size(50.dp)
-                .align(Alignment.BottomStart)
-                .offset(x = 6.dp, y = (-2).dp),
-            shape = CircleShape,
-            color = Color(0xFFB71C1C),
-            fontSize = 20.sp,
-            isEditing = isEditing,
-            onPressState = { pressed ->
-                pressedMask = if (pressed) pressedMask or GbaBridge.KEY_B else pressedMask and GbaBridge.KEY_B.inv()
-            }
-        )
-
-        // A Button (Right / Higher - Standard GBA Ergonomic Diagonal)
-        GamepadButton(
-            text = "A",
-            modifier = Modifier
-                .size(50.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = (-4).dp, y = (-18).dp),
-            shape = CircleShape,
-            color = Color(0xFF1B5E20),
-            fontSize = 20.sp,
-            isEditing = isEditing,
-            onPressState = { pressed ->
-                pressedMask = if (pressed) pressedMask or GbaBridge.KEY_A else pressedMask and GbaBridge.KEY_A.inv()
-            }
-        )
-    }
+    onDirectionChanged(mask)
 }
 
 @Composable
@@ -811,7 +1148,8 @@ fun GamepadButton(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(if (isPressed) color.copy(alpha = 1.0f) else color.copy(alpha = 0.75f))
+            .background(if (isPressed) color.copy(alpha = 1.0f) else color.copy(alpha = 0.80f))
+            .border(1.5.dp, Color(0x55FFFFFF), shape)
             .then(pointerMod),
         contentAlignment = Alignment.Center
     ) {
