@@ -8,6 +8,7 @@
 #include <mgba/core/interface.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/cheats.h>
+#include <mgba/core/serialize.h>
 #include <mgba/internal/gba/cheats.h>
 #include <mgba-util/vfs.h>
 
@@ -237,11 +238,14 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeSaveState(
     if (!sCore) return JNI_FALSE;
 
     const char* pathStr = env->GetStringUTFChars(path, nullptr);
-    struct VFile* vf = VFileOpen(pathStr, O_CREAT | O_TRUNC | O_WRONLY);
+    struct VFile* vf = VFileOpen(pathStr, O_CREAT | O_TRUNC | O_RDWR);
     env->ReleaseStringUTFChars(path, pathStr);
 
-    if (!vf) return JNI_FALSE;
-    bool success = mCoreSaveStateNamed(sCore, vf, 0);
+    if (!vf) {
+        LOGE("Failed to open file for save state: %d", slot);
+        return JNI_FALSE;
+    }
+    bool success = mCoreSaveStateNamed(sCore, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
     vf->close(vf);
 
     LOGI("SaveState named: slot=%d, success=%d", slot, success);
@@ -258,8 +262,11 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeLoadState(
     struct VFile* vf = VFileOpen(pathStr, O_RDONLY);
     env->ReleaseStringUTFChars(path, pathStr);
 
-    if (!vf) return JNI_FALSE;
-    bool success = mCoreLoadStateNamed(sCore, vf, 0);
+    if (!vf) {
+        LOGE("Failed to open file for load state: %d", slot);
+        return JNI_FALSE;
+    }
+    bool success = mCoreLoadStateNamed(sCore, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
     vf->close(vf);
 
     LOGI("LoadState named: slot=%d, success=%d", slot, success);
@@ -277,7 +284,7 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeSaveBattery(
     if (!sram || size == 0) return JNI_FALSE;
 
     const char* pathStr = env->GetStringUTFChars(path, nullptr);
-    struct VFile* vf = VFileOpen(pathStr, O_CREAT | O_TRUNC | O_WRONLY);
+    struct VFile* vf = VFileOpen(pathStr, O_CREAT | O_TRUNC | O_RDWR);
     env->ReleaseStringUTFChars(path, pathStr);
 
     if (!vf) {

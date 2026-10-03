@@ -33,7 +33,6 @@ fun SettingsDialog(
     var aspect by remember { mutableStateOf(settings.aspectMode) }
     var speed by remember { mutableStateOf(settings.fastForwardSpeed) }
     var vol by remember { mutableStateOf(settings.volume) }
-    var muted by remember { mutableStateOf(settings.isMuted) }
     var opacity by remember { mutableStateOf(settings.gamepadOpacity) }
     var orientation by remember { mutableStateOf(settings.orientationMode) }
     var hideControls by remember { mutableStateOf(settings.hideGamepad) }
@@ -218,26 +217,13 @@ fun SettingsDialog(
                     }
                 }
 
-                // --- ÂM LƯỢNG & TẮT TIẾNG ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Âm lượng: ${(vol * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
-                    Switch(
-                        checked = !muted,
-                        onCheckedChange = { checked ->
-                            muted = !checked
-                            onSettingsChanged(settings.copy(isMuted = !checked))
-                        }
-                    )
-                }
+                // --- ÂM LƯỢNG ---
+                Text("Âm lượng: ${(vol * 100).toInt()}%", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
                 Slider(
                     value = vol,
                     onValueChange = {
                         vol = it
-                        onSettingsChanged(settings.copy(volume = it))
+                        onSettingsChanged(settings.copy(volume = it, isMuted = it <= 0.01f))
                     },
                     valueRange = 0f..1f
                 )

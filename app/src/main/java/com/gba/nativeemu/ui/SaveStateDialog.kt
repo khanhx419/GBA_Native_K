@@ -30,6 +30,7 @@ fun SaveStateDialog(
     onDismiss: () -> Unit
 ) {
     var message by remember { mutableStateOf<String?>(null) }
+    var refreshTrigger by remember { mutableStateOf(0) }
     val dateFormat = remember { SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()) }
 
     AlertDialog(
@@ -51,8 +52,8 @@ fun SaveStateDialog(
                 Text("Các vị trí lưu nhanh (Save Slots)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
 
                 (1..5).forEach { slot ->
-                    val file = saveRepository.getStateFile(gameName, slot)
-                    val exists = file.exists()
+                    val file = remember(slot, refreshTrigger) { saveRepository.getStateFile(gameName, slot) }
+                    val exists = file.exists() && file.length() > 1000
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -89,6 +90,7 @@ fun SaveStateDialog(
                                 Button(
                                     onClick = {
                                         onSaveState(slot)
+                                        refreshTrigger++
                                         message = "💾 Đã lưu vào Vị trí $slot"
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),

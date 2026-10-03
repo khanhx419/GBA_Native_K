@@ -374,161 +374,222 @@ fun LayoutEditorOverlay(
     onCancelEditing: () -> Unit,
     onSaveLayout: () -> Unit
 ) {
+    // Dock at bottom by default in landscape so top controls (L, R, Select, Start) are never blocked!
+    var isDockedAtTop by remember { mutableStateOf(!isLandscape) }
+    var isMinimized by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = if (isLandscape) 8.dp else 40.dp, start = 12.dp, end = 12.dp),
-        contentAlignment = Alignment.TopCenter
+            .padding(
+                top = if (isDockedAtTop) (if (isLandscape) 6.dp else 36.dp) else 0.dp,
+                bottom = if (!isDockedAtTop) (if (isLandscape) 6.dp else 24.dp) else 0.dp,
+                start = 10.dp,
+                end = 10.dp
+            ),
+        contentAlignment = if (isDockedAtTop) Alignment.TopCenter else Alignment.BottomCenter
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth(if (isLandscape) 0.85f else 1.0f)
-                .wrapContentHeight(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xF2161624)),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.5.dp, Color(0xFF00E5FF))
-        ) {
-            Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+        if (isMinimized) {
+            // Minimized Floating Pill - Zero visual obstruction while dragging buttons
+            Surface(
+                onClick = { isMinimized = false },
+                color = Color(0xD910101C),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, Color(0xFF00E5FF)),
+                shadowElevation = 8.dp
             ) {
-                // Row 1: Title and Hint
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "🎮 CHỈNH BỐ CỤC PHÍM",
-                            color = Color(0xFF00E5FF),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isLandscape) "(Ngang)" else "(Dọc)",
-                            color = Color(0xFFAAAAAA),
-                            fontSize = 11.sp
-                        )
-                    }
-                    Text(
-                        text = "👆 Kéo phím trên màn hình",
-                        color = Color(0xFFFFD54F),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Row 2: Element Selector Chips
-                val elements = listOf(
-                    "dpad" to "D-Pad / Joy",
-                    "btn_a" to "Nút A",
-                    "btn_b" to "Nút B",
-                    "btn_ta" to "Nút TA",
-                    "btn_tb" to "Nút TB",
-                    "shoulder_l" to "Nút L",
-                    "shoulder_r" to "Nút R",
-                    "select_start" to "Select/Start"
-                )
-                val chipScrollState = rememberScrollState()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(chipScrollState),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    elements.forEach { (id, label) ->
-                        FilterChip(
-                            selected = selectedElementId == id,
-                            onClick = { onSelectElement(id) },
-                            label = {
-                                Text(
-                                    label,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selectedElementId == id) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF00B0FF),
-                                selectedLabelColor = Color.Black
-                            )
-                        )
-                    }
-                }
-
-                // Row 3: Scale Adjustment and Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Scale Controls: [-] 100% [+]
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    Text("🎮 Đang chỉnh phím (Kéo tự do)", fontSize = 11.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF2C2C3E), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text("Cỡ:", fontSize = 11.sp, color = Color.White)
-                        IconButton(
-                            onClick = onDecreaseScale,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(Color(0xFF2C2C3E), RoundedCornerShape(6.dp))
-                        ) {
-                            Text("-", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0xFF1E1E28), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val scalePercent = (currentScale * 100).roundToInt()
+                        Text("Mở rộng ↗", fontSize = 10.sp, color = Color.White)
+                    }
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(if (isLandscape) 0.85f else 1.0f)
+                    .wrapContentHeight(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xD9141422)),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.2.dp, Color(0xFF00E5FF))
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Row 1: Header with Dock Flip & Minimize
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "$scalePercent%",
+                                text = "🎮 BỐ CỤC PHÍM",
                                 color = Color(0xFF00E5FF),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "👆 Kéo phím trên màn",
+                                color = Color(0xFFFFD54F),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
-                        IconButton(
-                            onClick = onIncreaseScale,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(Color(0xFF2C2C3E), RoundedCornerShape(6.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("+", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            // Dock Flip button: Lên / Xuống
+                            IconButton(
+                                onClick = { isDockedAtTop = !isDockedAtTop },
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(Color(0xFF2C2C3E), RoundedCornerShape(5.dp))
+                            ) {
+                                Text(
+                                    text = if (isDockedAtTop) "⬇" else "⬆",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Minimize button
+                            IconButton(
+                                onClick = { isMinimized = true },
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(Color(0xFF2C2C3E), RoundedCornerShape(5.dp))
+                            ) {
+                                Text("—", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 
-                    // Action Buttons: Đặt lại, Hủy, Lưu
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(
-                            onClick = onResetLayout,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(30.dp)
+                    // Row 2: Element Selector Chips (Horizontally Scrollable)
+                    val elements = listOf(
+                        "dpad" to "D-Pad / Joy",
+                        "btn_a" to "Nút A",
+                        "btn_b" to "Nút B",
+                        "btn_ta" to "Nút TA",
+                        "btn_tb" to "Nút TB",
+                        "shoulder_l" to "Nút L",
+                        "shoulder_r" to "Nút R",
+                        "select_start" to "Select/Start"
+                    )
+                    val chipScrollState = rememberScrollState()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(chipScrollState),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        elements.forEach { (id, label) ->
+                            FilterChip(
+                                selected = selectedElementId == id,
+                                onClick = { onSelectElement(id) },
+                                label = {
+                                    Text(
+                                        label,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (selectedElementId == id) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF00B0FF),
+                                    selectedLabelColor = Color.Black
+                                ),
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
+                    }
+
+                    // Row 3: Scale Adjustment and Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Scale Controls: [-] 100% [+]
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("Đặt lại", fontSize = 10.sp, color = Color(0xFFFFB74D))
+                            Text("Cỡ:", fontSize = 11.sp, color = Color.White)
+                            IconButton(
+                                onClick = onDecreaseScale,
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .background(Color(0xFF2C2C3E), RoundedCornerShape(5.dp))
+                            ) {
+                                Text("-", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(Color(0xFF1E1E28), RoundedCornerShape(5.dp))
+                                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val scalePercent = (currentScale * 100).roundToInt()
+                                Text(
+                                    "$scalePercent%",
+                                    color = Color(0xFF00E5FF),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            IconButton(
+                                onClick = onIncreaseScale,
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .background(Color(0xFF2C2C3E), RoundedCornerShape(5.dp))
+                            ) {
+                                Text("+", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
                         }
 
-                        OutlinedButton(
-                            onClick = onCancelEditing,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(30.dp)
-                        ) {
-                            Text("Hủy", fontSize = 10.sp, color = Color.White)
-                        }
+                        // Action Buttons: Đặt lại, Hủy, Lưu
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            OutlinedButton(
+                                onClick = onResetLayout,
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("Đặt lại", fontSize = 10.sp, color = Color(0xFFFFB74D))
+                            }
 
-                        Button(
-                            onClick = onSaveLayout,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
-                            modifier = Modifier.height(30.dp)
-                        ) {
-                            Text("LƯU", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            OutlinedButton(
+                                onClick = onCancelEditing,
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("Hủy", fontSize = 10.sp, color = Color.White)
+                            }
+
+                            Button(
+                                onClick = onSaveLayout,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(6.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("LƯU", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
                         }
                     }
                 }

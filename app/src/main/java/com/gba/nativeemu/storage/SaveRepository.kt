@@ -43,17 +43,25 @@ class SaveRepository(private val context: Context) {
 
     fun saveState(gameName: String, slot: Int): Boolean {
         val file = getStateFile(gameName, slot)
-        return GbaBridge.nativeSaveState(slot, file.absolutePath)
+        val success = GbaBridge.nativeSaveState(slot, file.absolutePath)
+        Log.i(TAG, "saveState slot $slot for $gameName: success=$success, size=${file.length()}")
+        return success && file.exists() && file.length() > 1000
     }
 
     fun loadState(gameName: String, slot: Int): Boolean {
         val file = getStateFile(gameName, slot)
-        if (!file.exists()) return false
-        return GbaBridge.nativeLoadState(slot, file.absolutePath)
+        if (!file.exists() || file.length() < 1000) {
+            Log.w(TAG, "loadState slot $slot failed: file not found or corrupted (${file.length()} bytes)")
+            return false
+        }
+        val success = GbaBridge.nativeLoadState(slot, file.absolutePath)
+        Log.i(TAG, "loadState slot $slot for $gameName: success=$success")
+        return success
     }
 
     fun stateExists(gameName: String, slot: Int): Boolean {
-        return getStateFile(gameName, slot).exists()
+        val file = getStateFile(gameName, slot)
+        return file.exists() && file.length() > 1000
     }
 
     fun exportBatterySaveToUri(gameName: String, destUri: Uri): Boolean {
