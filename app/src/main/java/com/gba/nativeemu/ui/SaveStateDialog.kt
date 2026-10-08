@@ -16,6 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gba.nativeemu.storage.SaveRepository
 import java.text.SimpleDateFormat
 import java.util.*
@@ -24,9 +27,9 @@ import java.util.*
 fun SaveStateDialog(
     gameName: String,
     saveRepository: SaveRepository,
-    onSaveState: (Int) -> Unit,
-    onLoadState: (Int) -> Unit,
-    onDeleteState: (Int) -> Unit,
+    onSaveState: (Int) -> Boolean,
+    onLoadState: (Int) -> Boolean,
+    onDeleteState: (Int) -> Boolean,
     onExportBattery: () -> Unit,
     onImportBattery: () -> Unit,
     onExportJson: () -> Unit,
@@ -34,8 +37,23 @@ fun SaveStateDialog(
     onDismiss: () -> Unit
 ) {
     var message by remember { mutableStateOf<String?>(null) }
+    var isErrorMessage by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableStateOf(0) }
     val dateFormat = remember { SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()) }
+
+    // Auto-refresh slots when returning to the app from external SAF file pickers
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -50,14 +68,19 @@ fun SaveStateDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (message != null) {
-                    Text(message!!, color = Color(0xFF00E676), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        message!!,
+                        color = if (isErrorMessage) Color(0xFFFF5252) else Color(0xFF00E676),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
                 Text("Các vị trí lưu nhanh (Save Slots)", style = MaterialTheme.typography.titleSmall, color = Color(0xFF00E5FF))
 
                 (1..5).forEach { slot ->
                     val file = remember(slot, refreshTrigger) { saveRepository.getStateFile(gameName, slot) }
-                    val exists = file.exists() && file.length() > 1000
+                    val exists = file.exists() && file.length() > 0
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -75,7 +98,7 @@ fun SaveStateDialog(
                                 Text("Vị trí $slot", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 if (exists) {
                                     val dateStr = dateFormat.format(Date(file.lastModified()))
-                                    val sizeKb = file.length() / 1024
+                                    val sizeKb = (file.length() + 1023) / 1024
                                     Text(
                                         "$dateStr (${sizeKb} KB)",
                                         color = Color(0xFF81C784),
@@ -96,9 +119,15 @@ fun SaveStateDialog(
                             ) {
                                 Button(
                                     onClick = {
-                                        onSaveState(slot)
+                                        val ok = onSaveState(slot)
                                         refreshTrigger++
-                                        message = "💾 Đã lưu vào Vị trí $slot"
+                                        if (ok) {
+                                            message = "💾 Đã lưu vào Vị trí $slot"
+                                            isErrorMessage = false
+                                        } else {
+                                            message = "❌ Lưu Vị trí $slot thất bại"
+                                            isErrorMessage = true
+                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -109,8 +138,14 @@ fun SaveStateDialog(
 
                                 OutlinedButton(
                                     onClick = {
-                                        onLoadState(slot)
-                                        message = "⚡ Đã tải Vị trí $slot"
+                                        val ok = onLoadState(slot)
+                                        if (ok) {
+                                            message = "⚡ Đã tải Vị trí $slot thành công"
+                                            isErrorMessage = false
+                                        } else {
+                                            message = "❌ Tải Vị trí $slot thất bại"
+                                            isErrorMessage = true
+                                        }
                                     },
                                     enabled = exists,
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
@@ -123,9 +158,15 @@ fun SaveStateDialog(
                                 if (exists) {
                                     IconButton(
                                         onClick = {
-                                            onDeleteState(slot)
+                                            val ok = onDeleteState(slot)
                                             refreshTrigger++
-                                            message = "🗑️ Đã xóa Vị trí $slot"
+                                            if (ok) {
+                                                message = "🗑️ Đã xóa Vị trí $slot"
+                                                isErrorMessage = false
+                                            } else {
+                                                message = "❌ Xóa Vị trí $slot thất bại"
+                                                isErrorMessage = true
+                                            }
                                         },
                                         modifier = Modifier.size(32.dp),
                                         colors = IconButtonDefaults.iconButtonColors(contentColor = Color(0xFFEF5350))

@@ -51,12 +51,12 @@ class SaveRepository(private val context: Context) {
         val file = getStateFile(gameName, slot)
         val success = GbaBridge.nativeSaveState(slot, file.absolutePath)
         Log.i(TAG, "saveState slot $slot for $gameName: success=$success, size=${file.length()}")
-        return success && file.exists() && file.length() > 1000
+        return success && file.exists() && file.length() > 0
     }
 
     fun loadState(gameName: String, slot: Int): Boolean {
         val file = getStateFile(gameName, slot)
-        if (!file.exists() || file.length() < 1000) {
+        if (!file.exists() || file.length() == 0L) {
             Log.w(TAG, "loadState slot $slot failed: file not found or corrupted (${file.length()} bytes)")
             return false
         }
@@ -67,7 +67,7 @@ class SaveRepository(private val context: Context) {
 
     fun stateExists(gameName: String, slot: Int): Boolean {
         val file = getStateFile(gameName, slot)
-        return file.exists() && file.length() > 1000
+        return file.exists() && file.length() > 0
     }
 
     fun deleteState(gameName: String, slot: Int): Boolean {

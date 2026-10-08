@@ -207,10 +207,16 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeStepFrame(
     std::lock_guard<std::mutex> lock(sCoreMutex);
     if (!sCore) return;
 
+    // Skip software scanline rasterization for intermediate fast-forward step
+    if (sCore->board) {
+        struct GBA* gba = static_cast<struct GBA*>(sCore->board);
+        gba->video.frameskipCounter = 1;
+    }
+
     sCore->setKeys(sCore, keyMask);
     sCore->runFrame(sCore);
 
-    // Process audio samples
+    // Consume and discard audio samples so blip buffer does not overflow
     blip_t* left = sCore->getAudioChannel(sCore, 0);
     blip_t* right = sCore->getAudioChannel(sCore, 1);
     if (left && right) {
@@ -219,7 +225,7 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeStepFrame(
             if (avail > 4096) avail = 4096;
             blip_read_samples(left, sAudioBuffer, avail, 1);
             blip_read_samples(right, sAudioBuffer + 1, avail, 1);
-            sAudioEngine.writeSamples(sAudioBuffer, avail);
+            // Do NOT call sAudioEngine.writeSamples() on intermediate frames to prevent buffer bloat
         }
     }
 }
@@ -298,6 +304,10 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeLoadState(
     vf->close(vf);
     env->ReleaseStringUTFChars(path, pathStr);
 
+    if (success) {
+        sAudioEngine.reset();
+    }
+
     LOGI("LoadState final: slot=%d, success=%d", slot, success);
     return success ? JNI_TRUE : JNI_FALSE;
 }
@@ -340,6 +350,9 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeLoadBattery(
     env->ReleaseStringUTFChars(path, pathStr);
 
     LOGI("Battery save loaded: %d", success);
+    if (success) {
+        sAudioEngine.reset();
+    }
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -383,10 +396,10 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeAddCheat(
         }
     }
 
+    LOGI("Add cheat '%s' success=%d", nameStr, success);
     env->ReleaseStringUTFChars(name, nameStr);
     env->ReleaseStringUTFChars(code, codeStr);
 
-    LOGI("Add cheat '%s' success=%d", nameStr, success);
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -592,6 +605,12 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeRenderFrame(
     std::lock_guard<std::mutex> lock(sCoreMutex);
 
     if (sCore) {
+        // Ensure full scanline rasterization for presented frame
+        if (sCore->board) {
+            struct GBA* gba = static_cast<struct GBA*>(sCore->board);
+            gba->video.frameskipCounter = 0;
+        }
+
         sCore->setKeys(sCore, keyMask);
         sCore->runFrame(sCore);
 

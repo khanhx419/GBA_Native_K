@@ -137,8 +137,8 @@ fun GameScreen(
 
                     var rendered = false
                     var steps = 0
-                    // Scale steps to fast-forward multiplier (e.g. up to 24-30 steps for 8x)
-                    val maxSteps = if (ff) (speed * 3f).toInt().coerceIn(8, 32) else 4
+                    // Scale steps to fast-forward multiplier (e.g. up to 48 steps for 16x)
+                    val maxSteps = if (ff) (speed * 2.5f).toInt().coerceIn(8, 48) else 4
                     val keyMask = currentKeyMaskRef.get()
 
                     while (accumulatorNs >= GBA_FRAME_TIME_NS && steps < maxSteps) {
@@ -344,14 +344,17 @@ fun GameScreen(
                 onSaveState = { slot ->
                     val ok = saveRepository.saveState(gameTitle, slot)
                     Toast.makeText(context, if (ok) "💾 Đã lưu Slot $slot" else "❌ Lỗi lưu", Toast.LENGTH_SHORT).show()
+                    ok
                 },
                 onLoadState = { slot ->
                     val ok = saveRepository.loadState(gameTitle, slot)
                     Toast.makeText(context, if (ok) "⚡ Đã tải Slot $slot" else "❌ Lỗi tải", Toast.LENGTH_SHORT).show()
+                    ok
                 },
                 onDeleteState = { slot ->
                     val ok = saveRepository.deleteState(gameTitle, slot)
                     Toast.makeText(context, if (ok) "🗑️ Đã xóa Slot $slot" else "❌ Lỗi xóa", Toast.LENGTH_SHORT).show()
+                    ok
                 },
                 onExportBattery = onExportBattery,
                 onImportBattery = onImportBattery,
