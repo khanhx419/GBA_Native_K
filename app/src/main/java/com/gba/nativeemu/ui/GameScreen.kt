@@ -29,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.gba.nativeemu.cheat.CheatRepository
 import com.gba.nativeemu.core.GbaBridge
+import com.gba.nativeemu.scanner.MemoryScanner
 import com.gba.nativeemu.storage.CustomLayoutState
 import com.gba.nativeemu.storage.EmulatorSettings
 import com.gba.nativeemu.storage.SaveRepository
@@ -86,6 +87,8 @@ fun GameScreen(
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSaveStateDialog by remember { mutableStateOf(false) }
     var showCheatDialog by remember { mutableStateOf(false) }
+    var showMemoryScannerDialog by remember { mutableStateOf(false) }
+    val memoryScanner = remember { MemoryScanner() }
 
     LaunchedEffect(gameTitle) {
         cheatRepository.applyActiveCheats(gameTitle)
@@ -311,6 +314,10 @@ fun GameScreen(
                     showSettingsDialog = false
                     showCheatDialog = true
                 },
+                onOpenScanner = {
+                    showSettingsDialog = false
+                    showMemoryScannerDialog = true
+                },
                 onOpenLayoutEditor = {
                     showSettingsDialog = false
                     isEditingLayout = true
@@ -359,6 +366,15 @@ fun GameScreen(
                 gameTitle = gameTitle,
                 cheatRepository = cheatRepository,
                 onDismiss = { showCheatDialog = false }
+            )
+        }
+
+        if (showMemoryScannerDialog) {
+            MemoryScannerDialog(
+                gameTitle = gameTitle,
+                memoryScanner = memoryScanner,
+                cheatRepository = cheatRepository,
+                onDismiss = { showMemoryScannerDialog = false }
             )
         }
     }

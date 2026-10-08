@@ -11,6 +11,8 @@
 #include <mgba/core/cheats.h>
 #include <mgba/core/serialize.h>
 #include <mgba/internal/gba/cheats.h>
+#include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/memory.h>
 #include <mgba-util/vfs.h>
 
 #include "audio_engine.h"
@@ -406,6 +408,102 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeReadMemory(
         return static_cast<jint>(sCore->busRead32(sCore, addr));
     }
     return 0;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_gba_nativeemu_core_GbaBridge_nativeScanMemory(
+    JNIEnv* env, jobject /*thiz*/,
+    jint targetVal, jint valType, jint compType, jintArray prevAddrs) {
+    std::lock_guard<std::mutex> lock(sCoreMutex);
+    if (!sCore) return env->NewIntArray(0);
+
+    struct GBA* gba = static_cast<struct GBA*>(sCore->board);
+    if (!gba || !gba->memory.wram || !gba->memory.iwram) return env->NewIntArray(0);
+
+    const uint8_t* ewram = reinterpret_cast<const uint8_t*>(gba->memory.wram);
+    const uint8_t* iwram = reinterpret_cast<const uint8_t*>(gba->memory.iwram);
+
+    auto readVal = [&](uint32_t addr) -> uint32_t {
+        const uint8_t* buf = nullptr;
+        uint32_t offset = 0;
+        if (addr >= 0x02000000 && addr <= 0x02040000 - valType) {
+            buf = ewram;
+            offset = addr - 0x02000000;
+        } else if (addr >= 0x03000000 && addr <= 0x03008000 - valType) {
+            buf = iwram;
+            offset = addr - 0x03000000;
+        } else {
+            return 0;
+        }
+
+        if (valType == 1) return buf[offset];
+        if (valType == 2) return buf[offset] | (buf[offset + 1] << 8);
+        if (valType == 4) return buf[offset] | (buf[offset + 1] << 8) | (buf[offset + 2] << 16) | (buf[offset + 3] << 24);
+        return 0;
+    };
+
+    std::vector<int> matches;
+    matches.reserve(5000);
+    uint32_t target = static_cast<uint32_t>(targetVal);
+
+    if (prevAddrs != nullptr) {
+        jsize len = env->GetArrayLength(prevAddrs);
+        jint* addrs = env->GetIntArrayElements(prevAddrs, nullptr);
+        for (jsize i = 0; i < len; ++i) {
+            uint32_t addr = static_cast<uint32_t>(addrs[i]);
+            uint32_t cur = readVal(addr);
+            bool match = false;
+            if (compType == 0) match = (cur == target);
+            else if (compType == 1) match = (cur > target);
+            else if (compType == 2) match = (cur < target);
+            else if (compType == 3) match = (cur != target);
+            if (match) {
+                matches.push_back(addrs[i]);
+                if (matches.size() >= 5000) break;
+            }
+        }
+        env->ReleaseIntArrayElements(prevAddrs, addrs, JNI_ABORT);
+    } else {
+        uint32_t step = (valType == 1) ? 1 : 2;
+
+        // Scan EWRAM (256KB)
+        for (uint32_t offset = 0; offset <= 0x040000 - valType; offset += step) {
+            uint32_t addr = 0x02000000 + offset;
+            uint32_t cur = readVal(addr);
+            bool match = false;
+            if (compType == 0) match = (cur == target);
+            else if (compType == 1) match = (cur > target);
+            else if (compType == 2) match = (cur < target);
+            else if (compType == 3) match = true;
+            if (match) {
+                matches.push_back(static_cast<int>(addr));
+                if (matches.size() >= 5000) break;
+            }
+        }
+
+        // Scan IWRAM (32KB)
+        if (matches.size() < 5000) {
+            for (uint32_t offset = 0; offset <= 0x008000 - valType; offset += step) {
+                uint32_t addr = 0x03000000 + offset;
+                uint32_t cur = readVal(addr);
+                bool match = false;
+                if (compType == 0) match = (cur == target);
+                else if (compType == 1) match = (cur > target);
+                else if (compType == 2) match = (cur < target);
+                else if (compType == 3) match = true;
+                if (match) {
+                    matches.push_back(static_cast<int>(addr));
+                    if (matches.size() >= 5000) break;
+                }
+            }
+        }
+    }
+
+    jintArray result = env->NewIntArray(matches.size());
+    if (!matches.empty()) {
+        env->SetIntArrayRegion(result, 0, matches.size(), matches.data());
+    }
+    return result;
 }
 
 JNIEXPORT void JNICALL

@@ -52,6 +52,17 @@ object GbaBridge {
     const val CHEAT_GAMESHARK = 2
     const val CHEAT_ACTION_REPLAY = 3
 
+    // Scanner types
+    const val SCAN_TYPE_U8 = 1
+    const val SCAN_TYPE_U16 = 2
+    const val SCAN_TYPE_U32 = 4
+
+    // Scanner compare modes
+    const val SCAN_COMPARE_EXACT = 0
+    const val SCAN_COMPARE_GREATER = 1
+    const val SCAN_COMPARE_LESS = 2
+    const val SCAN_COMPARE_CHANGED = 3
+
     external fun nativeInit(internalDir: String): Boolean
     external fun nativeLoadRom(romBytes: ByteArray, romSize: Int): Boolean
     external fun nativeLoadRomFile(romPath: String): Boolean
@@ -67,6 +78,12 @@ object GbaBridge {
     external fun nativeClearCheats()
     external fun nativeWriteMemory(address: Int, value: Int, size: Int): Boolean
     external fun nativeReadMemory(address: Int, size: Int): Int
+    external fun nativeScanMemory(
+        targetVal: Int,
+        valType: Int,
+        compType: Int,
+        prevAddrs: IntArray?
+    ): IntArray
     external fun nativeSetFastForward(ratio: Float)
     external fun nativeSetAudioMute(muted: Boolean)
     external fun nativeSetAudioVolume(volume: Float)

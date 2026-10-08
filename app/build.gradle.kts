@@ -13,8 +13,8 @@ android {
         applicationId = "com.gba.nativeemu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.4"
+        versionCode = 8
+        versionName = "1.5"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))

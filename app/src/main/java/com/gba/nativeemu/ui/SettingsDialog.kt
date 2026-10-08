@@ -25,6 +25,7 @@ fun SettingsDialog(
     onSettingsChanged: (EmulatorSettings) -> Unit,
     onOpenSaveStates: () -> Unit,
     onOpenCheats: () -> Unit,
+    onOpenScanner: () -> Unit = {},
     onOpenLayoutEditor: () -> Unit,
     onResetGame: () -> Unit,
     onCloseRom: () -> Unit,
@@ -57,7 +58,7 @@ fun SettingsDialog(
                 // --- PHÍM TẮT NHANH TÍNH NĂNG ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Button(
                         onClick = onOpenSaveStates,
@@ -65,9 +66,9 @@ fun SettingsDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C3E)),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Save States", fontSize = 12.sp)
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Saves", fontSize = 11.sp)
                     }
 
                     Button(
@@ -76,9 +77,20 @@ fun SettingsDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C3E)),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Cheats", fontSize = 12.sp)
+                        Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color(0xFFFFD600))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Cheats", fontSize = 11.sp)
+                    }
+
+                    Button(
+                        onClick = onOpenScanner,
+                        modifier = Modifier.weight(1.1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E3A8A)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color(0xFF00E5FF))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Dò RAM", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
