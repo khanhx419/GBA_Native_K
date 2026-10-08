@@ -103,12 +103,11 @@ bool GBADeserialize(struct GBA* gba, const struct GBASerializedState* state) {
 		uint32_t pc;
 		LOAD_32(pc, ARM_PC * sizeof(state->cpu.gprs[0]), state->cpu.gprs);
 		if ((ucheck == GBA_BIOS_CHECKSUM || gba->biosChecksum == GBA_BIOS_CHECKSUM) && pc < SIZE_BIOS && pc >= 0x20) {
-			error = true;
+			mLOG(GBA_STATE, WARN, "Savestate PC in BIOS, continuing anyway");
 		}
 	}
 	if (gba->memory.rom && (state->id != ((struct GBACartridge*) gba->memory.rom)->id || memcmp(state->title, ((struct GBACartridge*) gba->memory.rom)->title, sizeof(state->title)))) {
-		mLOG(GBA_STATE, WARN, "Savestate is for a different game");
-		error = true;
+		mLOG(GBA_STATE, WARN, "Savestate is for a different ROM variant, attempting load anyway");
 	} else if (!gba->memory.rom && state->id != 0) {
 		mLOG(GBA_STATE, WARN, "Savestate is for a game, but no game loaded");
 		error = true;

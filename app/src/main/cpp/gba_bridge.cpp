@@ -263,16 +263,42 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeLoadState(
 
     const char* pathStr = env->GetStringUTFChars(path, nullptr);
     struct VFile* vf = VFileOpen(pathStr, O_RDONLY);
-    env->ReleaseStringUTFChars(path, pathStr);
 
     if (!vf) {
-        LOGE("Failed to open file for load state: %d", slot);
+        LOGE("Failed to open file for load state: slot=%d, path=%s", slot, pathStr);
+        env->ReleaseStringUTFChars(path, pathStr);
         return JNI_FALSE;
     }
-    bool success = mCoreLoadStateNamed(sCore, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
-    vf->close(vf);
 
-    LOGI("LoadState named: slot=%d, success=%d", slot, success);
+    size_t fileSize = vf->size(vf);
+    LOGI("nativeLoadState: slot=%d, size=%zu, path=%s", slot, fileSize, pathStr);
+
+    // 1. Try standard mCoreLoadStateNamed with SAVESTATE_SAVEDATA | SAVESTATE_RTC
+    bool success = mCoreLoadStateNamed(sCore, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
+    LOGI("LoadState primary (SAVEDATA|RTC): slot=%d, success=%d", slot, success);
+
+    // 2. If primary failed, try with flags = 0
+    if (!success) {
+        vf->seek(vf, 0, SEEK_SET);
+        success = mCoreLoadStateNamed(sCore, vf, 0);
+        LOGI("LoadState fallback (flags=0): slot=%d, success=%d", slot, success);
+    }
+
+    // 3. Fallback: If it's a battery save file (e.g. <= 131072 bytes like 64KB/128KB from companion web app)
+    if (!success && fileSize > 0 && fileSize <= 131072) {
+        LOGI("LoadState fallback: file size %zu matches battery save, restoring as savedata", fileSize);
+        bool batOk = mCoreLoadSaveFile(sCore, pathStr, false);
+        if (batOk) {
+            sCore->reset(sCore);
+            success = true;
+            LOGI("LoadState battery fallback succeeded, core reset");
+        }
+    }
+
+    vf->close(vf);
+    env->ReleaseStringUTFChars(path, pathStr);
+
+    LOGI("LoadState final: slot=%d, success=%d", slot, success);
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
