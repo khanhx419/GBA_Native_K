@@ -82,11 +82,12 @@ class SaveRepository(private val context: Context) {
         destUri: Uri,
         settings: EmulatorSettings,
         layoutPortrait: CustomLayoutState,
-        layoutLandscape: CustomLayoutState
+        layoutLandscape: CustomLayoutState,
+        cheatsJsonArray: JSONArray? = null
     ): Boolean {
         return try {
             val root = JSONObject()
-            root.put("version", "1.3")
+            root.put("version", "1.4")
             root.put("gameTitle", gameName)
             root.put("exportedAt", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
 
@@ -149,6 +150,10 @@ class SaveRepository(private val context: Context) {
             }
             root.put("saveStates", statesArr)
 
+            if (cheatsJsonArray != null) {
+                root.put("cheats", cheatsJsonArray)
+            }
+
             context.contentResolver.openOutputStream(destUri)?.use { out ->
                 out.write(root.toString(2).toByteArray(Charsets.UTF_8))
             }
@@ -165,7 +170,8 @@ class SaveRepository(private val context: Context) {
         val newLayoutPortrait: CustomLayoutState?,
         val newLayoutLandscape: CustomLayoutState?,
         val batteryRestored: Boolean,
-        val statesRestoredCount: Int
+        val statesRestoredCount: Int,
+        val importedCheatsArray: JSONArray? = null
     )
 
     fun importAllDataFromJsonUri(gameName: String, sourceUri: Uri): JsonImportResult {
@@ -242,13 +248,16 @@ class SaveRepository(private val context: Context) {
                 }
             }
 
+            val importedCheats = if (root.has("cheats")) root.getJSONArray("cheats") else null
+
             JsonImportResult(
                 success = true,
                 newSettings = importedSettings,
                 newLayoutPortrait = importedPortrait,
                 newLayoutLandscape = importedLandscape,
                 batteryRestored = batteryRestored,
-                statesRestoredCount = statesRestoredCount
+                statesRestoredCount = statesRestoredCount,
+                importedCheatsArray = importedCheats
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to import data from JSON", e)

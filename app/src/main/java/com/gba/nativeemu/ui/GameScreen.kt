@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.gba.nativeemu.cheat.CheatRepository
 import com.gba.nativeemu.core.GbaBridge
 import com.gba.nativeemu.storage.CustomLayoutState
 import com.gba.nativeemu.storage.EmulatorSettings
@@ -43,6 +44,7 @@ import kotlin.math.roundToInt
 fun GameScreen(
     gameTitle: String,
     saveRepository: SaveRepository,
+    cheatRepository: CheatRepository,
     settingsManager: SettingsManager,
     settings: EmulatorSettings,
     onSettingsChanged: (EmulatorSettings) -> Unit,
@@ -84,7 +86,10 @@ fun GameScreen(
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSaveStateDialog by remember { mutableStateOf(false) }
     var showCheatDialog by remember { mutableStateOf(false) }
-    val activeCheats = remember { mutableStateListOf<CheatItem>() }
+
+    LaunchedEffect(gameTitle) {
+        cheatRepository.applyActiveCheats(gameTitle)
+    }
 
     // GLSurfaceView with 59.73 FPS Accumulator Pacer (Ice Cool / Anti-Overheating)
     val glView = remember {
@@ -312,6 +317,7 @@ fun GameScreen(
                 },
                 onResetGame = {
                     GbaBridge.nativeReset()
+                    cheatRepository.applyActiveCheats(gameTitle)
                     onResetGame()
                     Toast.makeText(context, "🔄 Đã khởi động lại game", Toast.LENGTH_SHORT).show()
                 },
@@ -350,22 +356,8 @@ fun GameScreen(
 
         if (showCheatDialog) {
             CheatDialog(
-                cheats = activeCheats,
-                onAddCheat = { name, code ->
-                    val ok = GbaBridge.nativeAddCheat(name, code, GbaBridge.CHEAT_AUTODETECT)
-                    if (ok) {
-                        activeCheats.add(CheatItem(name, code, true))
-                        Toast.makeText(context, "✅ Đã thêm mã gian lận", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "❌ Mã không hợp lệ", Toast.LENGTH_SHORT).show()
-                    }
-                    ok
-                },
-                onClearAll = {
-                    GbaBridge.nativeClearCheats()
-                    activeCheats.clear()
-                    Toast.makeText(context, "Đã xóa toàn bộ mã gian lận", Toast.LENGTH_SHORT).show()
-                },
+                gameTitle = gameTitle,
+                cheatRepository = cheatRepository,
                 onDismiss = { showCheatDialog = false }
             )
         }

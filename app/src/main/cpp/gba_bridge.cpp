@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <mutex>
 #include <android/log.h>
@@ -329,10 +330,25 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeAddCheat(
     struct mCheatSet* set = device->createSet(device, nameStr);
     bool success = false;
     if (set) {
-        success = mCheatAddLine(set, codeStr, type >= 0 ? type : GBA_CHEAT_AUTODETECT);
-        if (success) {
+        std::stringstream ss(codeStr);
+        std::string line;
+        bool anyAdded = false;
+        while (std::getline(ss, line)) {
+            size_t first = line.find_first_not_of(" \t\r\n");
+            if (first == std::string::npos) continue;
+            size_t last = line.find_last_not_of(" \t\r\n");
+            std::string trimmed = line.substr(first, last - first + 1);
+            if (trimmed.empty()) continue;
+
+            if (mCheatAddLine(set, trimmed.c_str(), type >= 0 ? type : GBA_CHEAT_AUTODETECT)) {
+                anyAdded = true;
+            }
+        }
+
+        if (anyAdded) {
             mCheatAddSet(device, set);
             mCheatRefresh(device, set);
+            success = true;
         } else {
             mCheatSetDeinit(set);
             free(set);
@@ -342,7 +358,7 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeAddCheat(
     env->ReleaseStringUTFChars(name, nameStr);
     env->ReleaseStringUTFChars(code, codeStr);
 
-    LOGI("Add cheat success=%d", success);
+    LOGI("Add cheat '%s' success=%d", nameStr, success);
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -357,6 +373,39 @@ Java_com_gba_nativeemu_core_GbaBridge_nativeClearCheats(
         mCheatDeviceClear(device);
         LOGI("Cheats cleared");
     }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_gba_nativeemu_core_GbaBridge_nativeWriteMemory(
+    JNIEnv* /*env*/, jobject /*thiz*/, jint address, jint value, jint size) {
+    std::lock_guard<std::mutex> lock(sCoreMutex);
+    if (!sCore) return JNI_FALSE;
+    uint32_t addr = static_cast<uint32_t>(address);
+    uint32_t val = static_cast<uint32_t>(value);
+    if (size == 1) {
+        sCore->busWrite8(sCore, addr, static_cast<uint8_t>(val));
+    } else if (size == 2) {
+        sCore->busWrite16(sCore, addr, static_cast<uint16_t>(val));
+    } else if (size == 4) {
+        sCore->busWrite32(sCore, addr, val);
+    }
+    return JNI_TRUE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_gba_nativeemu_core_GbaBridge_nativeReadMemory(
+    JNIEnv* /*env*/, jobject /*thiz*/, jint address, jint size) {
+    std::lock_guard<std::mutex> lock(sCoreMutex);
+    if (!sCore) return 0;
+    uint32_t addr = static_cast<uint32_t>(address);
+    if (size == 1) {
+        return sCore->busRead8(sCore, addr);
+    } else if (size == 2) {
+        return sCore->busRead16(sCore, addr);
+    } else if (size == 4) {
+        return static_cast<jint>(sCore->busRead32(sCore, addr));
+    }
+    return 0;
 }
 
 JNIEXPORT void JNICALL

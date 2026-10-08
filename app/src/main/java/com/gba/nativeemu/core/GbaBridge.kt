@@ -65,6 +65,8 @@ object GbaBridge {
     external fun nativeLoadBattery(path: String): Boolean
     external fun nativeAddCheat(name: String, code: String, type: Int): Boolean
     external fun nativeClearCheats()
+    external fun nativeWriteMemory(address: Int, value: Int, size: Int): Boolean
+    external fun nativeReadMemory(address: Int, size: Int): Int
     external fun nativeSetFastForward(ratio: Float)
     external fun nativeSetAudioMute(muted: Boolean)
     external fun nativeSetAudioVolume(volume: Float)

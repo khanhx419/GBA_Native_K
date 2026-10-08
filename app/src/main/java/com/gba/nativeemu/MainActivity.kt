@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gba.nativeemu.core.GbaBridge
 import com.gba.nativeemu.core.RomInfo
+import com.gba.nativeemu.cheat.CheatRepository
 import com.gba.nativeemu.core.RomManager
 import com.gba.nativeemu.storage.EmulatorSettings
 import com.gba.nativeemu.storage.SaveRepository
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var romManager: RomManager
     private lateinit var saveRepository: SaveRepository
+    private lateinit var cheatRepository: CheatRepository
     private lateinit var settingsManager: SettingsManager
     private var currentGameTitle: String? = null
     private var physicalKeyMask = 0
@@ -58,6 +60,7 @@ class MainActivity : ComponentActivity() {
 
             romManager = RomManager(this)
             saveRepository = SaveRepository(this)
+            cheatRepository = CheatRepository(this)
             settingsManager = SettingsManager(this)
 
             // Initialize Native Core & Audio safely
@@ -176,7 +179,8 @@ class MainActivity : ComponentActivity() {
                         if (uri != null && title != null) {
                             val layoutPortrait = settingsManager.loadLayout(false)
                             val layoutLandscape = settingsManager.loadLayout(true)
-                            val ok = saveRepository.exportAllDataToJsonUri(title, uri, settings, layoutPortrait, layoutLandscape)
+                            val cheatsArr = cheatRepository.cheatsToJsonArray(cheatRepository.getCheats(title))
+                            val ok = saveRepository.exportAllDataToJsonUri(title, uri, settings, layoutPortrait, layoutLandscape, cheatsArr)
                             Toast.makeText(
                                 this@MainActivity,
                                 if (ok) "✅ Đã xuất dữ liệu JSON thành công!" else "❌ Lỗi xuất file JSON",
@@ -199,10 +203,18 @@ class MainActivity : ComponentActivity() {
                                 }
                                 res.newLayoutPortrait?.let { settingsManager.saveLayout(false, it) }
                                 res.newLayoutLandscape?.let { settingsManager.saveLayout(true, it) }
+                                res.importedCheatsArray?.let { arr ->
+                                    val cheats = cheatRepository.jsonArrayToCheats(arr)
+                                    cheatRepository.saveCheats(title, cheats)
+                                    cheatRepository.applyActiveCheats(title)
+                                }
                                 val statusMsg = buildString {
                                     append("✅ Đã khôi phục dữ liệu từ JSON!")
                                     if (res.batteryRestored) append(" (Có file Pin .sav)")
                                     if (res.statesRestoredCount > 0) append(" (${res.statesRestoredCount} Save slot)")
+                                    if (res.importedCheatsArray != null && res.importedCheatsArray.length() > 0) {
+                                        append(" (${res.importedCheatsArray.length()} Cheat)")
+                                    }
                                 }
                                 Toast.makeText(this@MainActivity, statusMsg, Toast.LENGTH_LONG).show()
                             } else {
@@ -215,6 +227,7 @@ class MainActivity : ComponentActivity() {
                         GameScreen(
                             gameTitle = currentTitle,
                             saveRepository = saveRepository,
+                            cheatRepository = cheatRepository,
                             settingsManager = settingsManager,
                             settings = settings,
                             onSettingsChanged = { newSettings ->
@@ -224,6 +237,7 @@ class MainActivity : ComponentActivity() {
                             onResetGame = {
                                 if (currentGameTitle != null) {
                                     saveRepository.loadBattery(currentGameTitle!!)
+                                    cheatRepository.applyActiveCheats(currentGameTitle!!)
                                 }
                             },
                             onCloseRom = {
@@ -273,6 +287,7 @@ class MainActivity : ComponentActivity() {
             currentGameTitle = info.title
             romManager.recordRomPlayed(info)
             saveRepository.loadBattery(info.title)
+            cheatRepository.applyActiveCheats(info.title)
             Toast.makeText(this, "Loaded: ${info.title}", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, "Error loading ROM with mGBA core", Toast.LENGTH_SHORT).show()
