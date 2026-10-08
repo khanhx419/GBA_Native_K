@@ -175,8 +175,8 @@ class MainActivity : ComponentActivity() {
                     val exportJsonLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.CreateDocument("application/json")
                     ) { uri: Uri? ->
-                        val title = currentGameTitle
-                        if (uri != null && title != null) {
+                        val title = currentGameTitle ?: currentTitle
+                        if (uri != null && title.isNotBlank()) {
                             val layoutPortrait = settingsManager.loadLayout(false)
                             val layoutLandscape = settingsManager.loadLayout(true)
                             val cheatsArr = cheatRepository.cheatsToJsonArray(cheatRepository.getCheats(title))
@@ -193,8 +193,8 @@ class MainActivity : ComponentActivity() {
                     val importJsonLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri: Uri? ->
-                        val title = currentGameTitle
-                        if (uri != null && title != null) {
+                        val title = currentGameTitle ?: currentTitle
+                        if (uri != null && title.isNotBlank()) {
                             val res = saveRepository.importAllDataFromJsonUri(title, uri)
                             if (res.success) {
                                 res.newSettings?.let {
@@ -218,7 +218,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Toast.makeText(this@MainActivity, statusMsg, Toast.LENGTH_LONG).show()
                             } else {
-                                Toast.makeText(this@MainActivity, "❌ Lỗi nhập file JSON", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this@MainActivity, "❌ Lỗi nhập JSON: ${res.errorMessage ?: "Không đọc được dữ liệu"}", Toast.LENGTH_LONG).show()
                             }
                         }
                     }
@@ -235,9 +235,10 @@ class MainActivity : ComponentActivity() {
                                 settingsManager.saveSettings(newSettings)
                             },
                             onResetGame = {
-                                if (currentGameTitle != null) {
-                                    saveRepository.loadBattery(currentGameTitle!!)
-                                    cheatRepository.applyActiveCheats(currentGameTitle!!)
+                                val t = currentGameTitle ?: currentTitle
+                                if (t.isNotBlank()) {
+                                    saveRepository.loadBattery(t)
+                                    cheatRepository.applyActiveCheats(t)
                                 }
                             },
                             onCloseRom = {
@@ -254,7 +255,7 @@ class MainActivity : ComponentActivity() {
                                 exportJsonLauncher.launch("${currentTitle}_backup.json")
                             },
                             onImportJson = {
-                                importJsonLauncher.launch(arrayOf("application/json", "*/*"))
+                                importJsonLauncher.launch(arrayOf("*/*"))
                             }
                         )
                     } else {

@@ -86,9 +86,14 @@ class SaveRepository(private val context: Context) {
         cheatsJsonArray: JSONArray? = null
     ): Boolean {
         return try {
+            // Ensure any recent in-game SRAM / Flash progress is flushed to disk
+            saveBattery(gameName)
+
             val root = JSONObject()
-            root.put("version", "1.4")
+            root.put("app", "GBA_Native_K")
+            root.put("version", "1.5")
             root.put("gameTitle", gameName)
+            root.put("romTitle", gameName) // For compatibility with companion web app
             root.put("exportedAt", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
 
             // Settings
@@ -131,6 +136,8 @@ class SaveRepository(private val context: Context) {
             if (batteryFile.exists() && batteryFile.length() > 0) {
                 val b64 = Base64.encodeToString(batteryFile.readBytes(), Base64.NO_WRAP)
                 root.put("batterySaveBase64", b64)
+            } else {
+                root.put("batterySaveBase64", JSONObject.NULL)
             }
 
             // Save States (1..5)
@@ -138,25 +145,31 @@ class SaveRepository(private val context: Context) {
             for (slot in 1..5) {
                 val sf = getStateFile(gameName, slot)
                 if (sf.exists() && sf.length() > 1000) {
+                    val sBytes = sf.readBytes()
+                    val b64 = Base64.encodeToString(sBytes, Base64.NO_WRAP)
                     val sObj = JSONObject().apply {
                         put("slot", slot)
                         put("sizeBytes", sf.length())
                         put("lastModified", sf.lastModified())
-                        val sBytes = sf.readBytes()
-                        put("dataBase64", Base64.encodeToString(sBytes, Base64.NO_WRAP))
+                        put("dataBase64", b64)
+                        put("stateBase64", b64) // For companion app compatibility
                     }
                     statesArr.put(sObj)
                 }
             }
             root.put("saveStates", statesArr)
+            root.put("states", statesArr) // For companion app compatibility
 
             if (cheatsJsonArray != null) {
                 root.put("cheats", cheatsJsonArray)
             }
 
-            context.contentResolver.openOutputStream(destUri)?.use { out ->
-                out.write(root.toString(2).toByteArray(Charsets.UTF_8))
-            }
+            context.contentResolver.openOutputStream(destUri, "wt")?.use { out ->
+                out.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write(root.toString())
+                    writer.flush()
+                }
+            } ?: return false
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to export data to JSON", e)
@@ -171,30 +184,39 @@ class SaveRepository(private val context: Context) {
         val newLayoutLandscape: CustomLayoutState?,
         val batteryRestored: Boolean,
         val statesRestoredCount: Int,
-        val importedCheatsArray: JSONArray? = null
+        val importedCheatsArray: JSONArray? = null,
+        val errorMessage: String? = null
     )
 
     fun importAllDataFromJsonUri(gameName: String, sourceUri: Uri): JsonImportResult {
         return try {
-            val jsonString = context.contentResolver.openInputStream(sourceUri)?.use { input ->
-                input.bufferedReader().use { it.readText() }
-            } ?: return JsonImportResult(false, null, null, null, false, 0)
+            val rawJson = context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                input.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            } ?: return JsonImportResult(false, null, null, null, false, 0, null, "Không mở được tệp")
+
+            // Remove UTF-8 BOM if present and trim whitespace
+            val jsonString = rawJson.trim().removePrefix("\uFEFF").trim()
+            if (!jsonString.startsWith("{")) {
+                return JsonImportResult(false, null, null, null, false, 0, null, "Định dạng không phải là tệp JSON")
+            }
 
             val root = JSONObject(jsonString)
 
             var importedSettings: EmulatorSettings? = null
-            if (root.has("settings")) {
-                val sObj = root.getJSONObject("settings")
-                importedSettings = EmulatorSettings(
-                    aspectMode = sObj.optInt("aspectMode", GbaBridge.ASPECT_FIT),
-                    fastForwardSpeed = sObj.optDouble("fastForwardSpeed", 2.0).toFloat(),
-                    volume = sObj.optDouble("volume", 1.0).toFloat(),
-                    isMuted = sObj.optBoolean("isMuted", false),
-                    gamepadOpacity = sObj.optDouble("gamepadOpacity", 0.85).toFloat(),
-                    orientationMode = sObj.optInt("orientationMode", EmulatorSettings.ORIENTATION_AUTO),
-                    hideGamepad = sObj.optBoolean("hideGamepad", false),
-                    movementMode = sObj.optInt("movementMode", EmulatorSettings.MOVEMENT_DPAD)
-                )
+            if (root.has("settings") && !root.isNull("settings")) {
+                val sObj = root.optJSONObject("settings")
+                if (sObj != null) {
+                    importedSettings = EmulatorSettings(
+                        aspectMode = sObj.optInt("aspectMode", GbaBridge.ASPECT_FIT),
+                        fastForwardSpeed = sObj.optDouble("fastForwardSpeed", 2.0).toFloat(),
+                        volume = sObj.optDouble("volume", 1.0).toFloat(),
+                        isMuted = sObj.optBoolean("isMuted", false),
+                        gamepadOpacity = sObj.optDouble("gamepadOpacity", 0.85).toFloat(),
+                        orientationMode = sObj.optInt("orientationMode", EmulatorSettings.ORIENTATION_AUTO),
+                        hideGamepad = sObj.optBoolean("hideGamepad", false),
+                        movementMode = sObj.optInt("movementMode", EmulatorSettings.MOVEMENT_DPAD)
+                    )
+                }
             }
 
             fun jsonToLayout(obj: JSONObject?): CustomLayoutState? {
@@ -223,32 +245,77 @@ class SaveRepository(private val context: Context) {
             val importedLandscape = jsonToLayout(root.optJSONObject("layoutLandscape"))
 
             var batteryRestored = false
-            if (root.has("batterySaveBase64")) {
-                val b64 = root.getString("batterySaveBase64")
-                val bytes = Base64.decode(b64, Base64.DEFAULT)
-                val bFile = getBatterySaveFile(gameName)
-                bFile.writeBytes(bytes)
-                loadBattery(gameName)
-                batteryRestored = true
+            val b64 = root.optString("batterySaveBase64", "").trim()
+            if (b64.isNotEmpty() && b64 != "null") {
+                try {
+                    val bytes = Base64.decode(b64, Base64.DEFAULT)
+                    if (bytes.isNotEmpty()) {
+                        val bFile = getBatterySaveFile(gameName)
+                        bFile.writeBytes(bytes)
+                        loadBattery(gameName)
+                        batteryRestored = true
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Lỗi giải mã batterySaveBase64", e)
+                }
             }
 
             var statesRestoredCount = 0
-            if (root.has("saveStates")) {
-                val statesArr = root.getJSONArray("saveStates")
+            // Check both saveStates and states (companion app schema)
+            val statesArr = root.optJSONArray("saveStates") ?: root.optJSONArray("states")
+            if (statesArr != null) {
                 for (i in 0 until statesArr.length()) {
-                    val sObj = statesArr.getJSONObject(i)
+                    val sObj = statesArr.optJSONObject(i) ?: continue
                     val slot = sObj.optInt("slot", -1)
-                    val dataB64 = sObj.optString("dataBase64", "")
-                    if (slot in 1..5 && dataB64.isNotEmpty()) {
-                        val sBytes = Base64.decode(dataB64, Base64.DEFAULT)
-                        val sf = getStateFile(gameName, slot)
-                        sf.writeBytes(sBytes)
-                        statesRestoredCount++
+                    val dataB64 = sObj.optString("dataBase64", "").ifEmpty {
+                        sObj.optString("stateBase64", "")
+                    }.trim()
+                    if (slot in 1..5 && dataB64.isNotEmpty() && dataB64 != "null") {
+                        try {
+                            val sBytes = Base64.decode(dataB64, Base64.DEFAULT)
+                            if (sBytes.isNotEmpty()) {
+                                val sf = getStateFile(gameName, slot)
+                                sf.writeBytes(sBytes)
+                                statesRestoredCount++
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Lỗi giải mã save state slot $slot", e)
+                        }
                     }
                 }
             }
 
-            val importedCheats = if (root.has("cheats")) root.getJSONArray("cheats") else null
+            // Universal cheats parsing (handles JSONArray, JSON string, or raw text)
+            var importedCheats: JSONArray? = null
+            if (root.has("cheats") && !root.isNull("cheats")) {
+                val cheatsVal = root.get("cheats")
+                if (cheatsVal is JSONArray) {
+                    importedCheats = cheatsVal
+                } else if (cheatsVal is String) {
+                    val str = cheatsVal.trim()
+                    if (str.startsWith("[")) {
+                        try {
+                            importedCheats = JSONArray(str)
+                        } catch (_: Exception) {}
+                    } else if (str.isNotBlank() && str != "null") {
+                        val arr = JSONArray()
+                        str.split(Regex("[\\r\\n]+")).forEachIndexed { idx, line ->
+                            val cleanLine = line.trim()
+                            if (cleanLine.isNotBlank()) {
+                                val cObj = JSONObject().apply {
+                                    put("id", java.util.UUID.randomUUID().toString())
+                                    put("name", "Cheat #${idx + 1}")
+                                    put("code", cleanLine)
+                                    put("enabled", true)
+                                    put("type", GbaBridge.CHEAT_AUTODETECT)
+                                }
+                                arr.put(cObj)
+                            }
+                        }
+                        if (arr.length() > 0) importedCheats = arr
+                    }
+                }
+            }
 
             JsonImportResult(
                 success = true,
@@ -257,11 +324,12 @@ class SaveRepository(private val context: Context) {
                 newLayoutLandscape = importedLandscape,
                 batteryRestored = batteryRestored,
                 statesRestoredCount = statesRestoredCount,
-                importedCheatsArray = importedCheats
+                importedCheatsArray = importedCheats,
+                errorMessage = null
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to import data from JSON", e)
-            JsonImportResult(false, null, null, null, false, 0)
+            JsonImportResult(false, null, null, null, false, 0, null, e.localizedMessage ?: e.message)
         }
     }
 
